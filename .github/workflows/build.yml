@@ -1,0 +1,41 @@
+name: Build Layuh EXE
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Setup CMake
+      uses: lukka/get-cmake@latest
+
+    - name: Build zlib from source (static library)
+      shell: cmd
+      run: |
+        cd /d "Layuh\cheat\include\zlib"
+        cmake -B build -G "Visual Studio 17 2022" -A x64
+        cmake --build build --config Release
+        if not exist "..\..\..\cheat\include\libs" mkdir "..\..\..\cheat\include\libs"
+        copy /Y "build\Release\zlibstatic.lib" "..\..\..\cheat\include\libs\zlib.lib"
+
+    - name: Build Layuh (Release x64)
+      run: msbuild Layuh.sln /p:Configuration=Release /p:Platform=x64 /maxcpucount
+
+    - name: Upload EXE artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Layuh-EXE
+        path: build/Layuh.exe
+        if-no-files-found: error
