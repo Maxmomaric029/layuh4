@@ -42,7 +42,7 @@ void set_streamproof(HWND hwnd, bool enable) {
 
 void overlay::render()
 {
-    WNDCLASSEXW wc = { sizeof(wc) , CS_CLASSDC , wnd_proc , 0L , 0L , GetModuleHandle(nullptr) , nullptr , nullptr , nullptr , nullptr , oxorany(L"Task Manager") , nullptr };
+    WNDCLASSEXW wc = { sizeof(wc) , CS_CLASSDC , wnd_proc , 0L , 0L , GetModuleHandle(nullptr) , nullptr , LoadCursor(nullptr, IDC_ARROW) , nullptr , nullptr , oxorany(L"Task Manager") , nullptr };
     ::RegisterClassExW(&wc);
     HWND hwnd = ::CreateWindowExW(
         WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED,
@@ -147,8 +147,26 @@ void overlay::render()
                 view_matrix = read<matrix>(globals::visual_engine + offsets::viewmatrix);
             }
 
-            // Aca iran los hooks del ESP/Aimbot con la nueva UI
-            // fs::esp.draw_players(view_matrix);
+            fs::esp.draw_players(view_matrix);
+            fs::esp.draw_radar(view_matrix);
+
+            fs::aimbot.aim_at_closest_player(view_matrix);
+            fs::aimbot.triggerbot(view_matrix);
+            fs::aimbot.circle_target();
+            fs::aimbot.sex_target();
+
+            fs::misc.teleport_to_nearest(view_matrix);
+            fs::misc.noclip();
+            fs::misc.fly();
+            fs::misc.spinbot();
+            fs::misc.speed_hack();
+            fs::misc.jump_power();
+            fs::misc.custom_fov();
+            fs::misc.gravity_modifier();
+            fs::misc.rapid_fire();
+            fs::misc.headless();
+            fs::misc.NoJumpCoolDown();
+            fs::misc.antistomp_realud();
         }
 
         if (overlay::enabled)
