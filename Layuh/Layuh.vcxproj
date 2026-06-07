@@ -74,8 +74,8 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)build</OutDir>
     <IntDir>$(SolutionDir)build/intermediates</IntDir>
-    <LibraryPath>C:\Users\Caoimhin\Downloads\Layuh\Layuh\cheat\menu\ui\imgui\DirectX\Lib\x64;C:\Users\Caoimhin\Downloads\havoc\havoc\src\auth\tsar\lib;C:\Users\Caoimhin\Downloads\ui (1)\thirdparty\Microsoft DirectX SDK\Lib\x64;C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Lib\x64;$(LibraryPath)</LibraryPath>
-    <IncludePath>C:\Users\Caoimhin\Desktop\Havoc Module\Synergy\Synergy\cottoncandy\Dependencies\Microsoft DirectX SDK\Include;C:\Users\Caoimhin\Downloads\ui (1)\thirdparty\Microsoft DirectX SDK\Include;C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\Caoimhin\Downloads\Layuh\Layuh\cheat\menu\ui\imgui\DirectX\Lib\x64;C:\Users\Caoimhin\Downloads\havoc\havoc\src\auth\tsar\lib;C:\Users\Caoimhin\Downloads\ui (1)\thirdparty[...]
+    <IncludePath>C:\Users\Caoimhin\Desktop\Havoc Module\Synergy\Synergy\cottoncandy\Dependencies\Microsoft DirectX SDK\Include;C:\Users\Caoimhin\Downloads\ui (1)\thirdparty\Microsoft DirectX SDK\I[...]
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>C:\freetype-master\include;C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Include;$(IncludePath)</IncludePath>
@@ -93,7 +93,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d11.lib;dxgi.lib;d3dx9.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3d11.lib;dxgi.lib;d3dcompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\Layuh\cheat\menu\ui\imgui\DirectX\Include;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
@@ -136,7 +136,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d11.lib;dxgi.lib;d3dx9.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3d11.lib;dxgi.lib;d3dcompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -148,7 +148,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>..\Layuh;..\Layuh\cheat\misc;..\Layuh\cheat\menu;..\Layuh\cheat\menu\ui;..\Layuh\cheat\menu\ui\imgui;..\Layuh\cheat\include;..\Layuh\cheat\include\curl;..\Layuh\cheat\include\keyauth;..\Layuh\cheat\menu\ui\imgui\DirectX\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Layuh;..\Layuh\cheat\misc;..\Layuh\cheat\menu;..\Layuh\cheat\menu\ui;..\Layuh\cheat\menu\ui\imgui;..\Layuh\cheat\include;..\Layuh\cheat\include\curl;..\Layu[...]
       <AdditionalOptions>/wd4005 /wd4305 %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -157,10 +157,9 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>ws2_32.lib;wldap32.lib;advapi32.lib;crypt32.lib;normaliz.lib
-;d3dx9.lib;zlib.lib;library_x64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;wldap32.lib;advapi32.lib;crypt32.lib;normaliz.lib;d3d11.lib;dxgi.lib;d3dcompiler.lib;zlib.lib;library_x64.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
-      <AdditionalLibraryDirectories>..\Layuh\cheat\include\libs;..\Layuh\cheat\include\keyauth;..\Layuh\cheat\menu\ui\imgui\DirectX\Include;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\Layuh\cheat\include\libs;..\Layuh\cheat\include\keyauth;..\Layuh\cheat\menu\ui\imgui\DirectX\Include;%(AdditionalLibraryDirectories)</AdditionalLibraryDirec[...]
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
