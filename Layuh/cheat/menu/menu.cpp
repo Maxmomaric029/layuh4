@@ -1861,7 +1861,7 @@ void CMenu::draw_instance_tree(uintptr_t instance)
     std::string class_name = utils::get_instance_classname(instance);
     std::string label = instance_name + oxorany("##") + std::to_string(instance);
 
-    LPDIRECT3DTEXTURE9 icon = nullptr;
+    ID3D11ShaderResourceView* icon = nullptr;
     if (class_icons.find(class_name) != class_icons.end()) {
         icon = class_icons[class_name];
     }
