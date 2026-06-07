@@ -200,7 +200,10 @@ void rescan_thread()
                     std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 attempts++;
             }
-            if (new_local_player) globals::local_player = new_local_player;
+            if (new_local_player) {
+                globals::local_player = new_local_player;
+                printf(oxorany("Rescan: Found LocalPlayer %llx\n"), (unsigned long long)new_local_player);
+            }
             last_place_id = current_place_id;
         }
     }
