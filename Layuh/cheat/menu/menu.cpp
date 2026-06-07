@@ -1,12 +1,11 @@
 #include "menu.h"
 #include "imgui.h"
-#include "imgui_impl_dx9.h"
+#include "imgui_impl_dx11.h"
 #include "imgui_impl_win32.h"
 #include "custom.hpp"
 #include "images.hpp"
 #include "fonts.hpp"
 #include <dwmapi.h>
-#include <d3d9.h>
 #include "stb_image.h"
 #include <tchar.h>
 #include "map"
@@ -82,47 +81,54 @@ bool copy_to_clipboard(const std::string& text) {
     return true;
 }
 
-LPDIRECT3DTEXTURE9 Layuh_preview = nullptr;
-LPDIRECT3DTEXTURE9 Layuh_preview_skeleton = nullptr;
+bool logged_in = false;
+ID3D11ShaderResourceView* Layuh_preview = nullptr;
+ID3D11ShaderResourceView* Layuh_preview_skeleton = nullptr;
 
-LPDIRECT3DTEXTURE9 LoadTextureFromMemory2(LPDIRECT3DDEVICE9 pDevice, const std::vector<uint8_t>& data) {
-    if (data.empty()) return nullptr;
+ID3D11ShaderResourceView* LoadTextureFromMemory2(ID3D11Device* pDevice, const std::vector<uint8_t>& data) {
+    if (data.empty() || !pDevice) return nullptr;
 
-    int width = 0;
-    int height = 0;
-    int channels = 0;
+    int width = 0, height = 0, channels = 0;
     unsigned char* image_data = stbi_load_from_memory(data.data(), static_cast<int>(data.size()), &width, &height, &channels, 4);
     if (!image_data) return nullptr;
 
-    LPDIRECT3DTEXTURE9 texture = nullptr;
-    HRESULT hr = pDevice->CreateTexture(width, height, 1, 0, D3DFMT_A8R8G8B8, D3DPOOL_MANAGED, &texture, nullptr);
-    if (FAILED(hr)) {
-        stbi_image_free(image_data);
-        return nullptr;
-    }
+    D3D11_TEXTURE2D_DESC desc;
+    ZeroMemory(&desc, sizeof(desc));
+    desc.Width = width;
+    desc.Height = height;
+    desc.MipLevels = 1;
+    desc.ArraySize = 1;
+    desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    desc.SampleDesc.Count = 1;
+    desc.Usage = D3D11_USAGE_DEFAULT;
+    desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    desc.CPUAccessFlags = 0;
 
-    D3DLOCKED_RECT rect;
-    if (SUCCEEDED(texture->LockRect(0, &rect, nullptr, 0))) {
-        unsigned char* dest = static_cast<unsigned char*>(rect.pBits);
-        for (int y = 0; y < height; ++y) {
-            unsigned char* src_row = image_data + y * width * 4;
-            unsigned char* dest_row = dest + y * rect.Pitch;
-            for (int x = 0; x < width; ++x) {
-                // Convert RGBA to BGRA
-                dest_row[x * 4 + 0] = src_row[x * 4 + 2]; // B
-                dest_row[x * 4 + 1] = src_row[x * 4 + 1]; // G
-                dest_row[x * 4 + 2] = src_row[x * 4 + 0]; // R
-                dest_row[x * 4 + 3] = src_row[x * 4 + 3]; // A
-            }
-        }
-        texture->UnlockRect(0);
-    } else {
-        texture->Release();
-        texture = nullptr;
-    }
+    ID3D11Texture2D* pTexture = nullptr;
+    D3D11_SUBRESOURCE_DATA subResource;
+    subResource.pSysMem = image_data;
+    subResource.SysMemPitch = desc.Width * 4;
+    subResource.SysMemSlicePitch = 0;
+    
+    // Swap R and B channels (STBI loads as RGBA, DX11 UNORM expects RGBA, so we are good actually, STBI provides RGBA)
+    // Actually D3D9 needed BGRA. D3D11 UNORM is RGBA. We don't need to swap for DXGI_FORMAT_R8G8B8A8_UNORM!
 
+    HRESULT hr = pDevice->CreateTexture2D(&desc, &subResource, &pTexture);
     stbi_image_free(image_data);
-    return texture;
+    if (FAILED(hr)) return nullptr;
+
+    ID3D11ShaderResourceView* pSRV = nullptr;
+    D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
+    ZeroMemory(&srvDesc, sizeof(srvDesc));
+    srvDesc.Format = desc.Format;
+    srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Texture2D.MipLevels = desc.MipLevels;
+    srvDesc.Texture2D.MostDetailedMip = 0;
+
+    pDevice->CreateShaderResourceView(pTexture, &srvDesc, &pSRV);
+    pTexture->Release();
+
+    return pSRV;
 }
 
 std::string get_local_player_name()
@@ -253,10 +259,95 @@ int current_tab = 0;
 uintptr_t g_spectate_target = 0;
 
 bool CMenu::draw_menu() {
+    extern ID3D11Device* g_pd3dDevice;
+
+    if (!logged_in) {
+        // Simple glassmorphism login screen
+        ImGui::SetNextWindowSize({ 350, 220 });
+        ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x / 2.0f, ImGui::GetIO().DisplaySize.y / 2.0f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.08f, 0.08f, 0.1f, 0.90f)); // Dark gray with high alpha
+        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.35f, 0.09f, 0.60f, 0.5f)); // Purple border
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.0f);
+        
+        ImGui::Begin("Login", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
+        
+        ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0]); // Using default font, which we will set to Segoe UI later
+        ImVec2 text_size = ImGui::CalcTextSize("DeadLock Authentication");
+        ImGui::SetCursorPosX((ImGui::GetWindowSize().x - text_size.x) * 0.5f);
+        ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "DeadLock Authentication");
+        ImGui::PopFont();
+        
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+        
+        static char password_buf[128] = "";
+        static bool remember_me = false;
+        static bool failed = false;
+
+        // Auto-load remember me
+        static bool init_cache = false;
+        if (!init_cache) {
+            init_cache = true;
+            char* pAppData = nullptr; size_t sz = 0;
+            _dupenv_s(&pAppData, &sz, "LOCALAPPDATA");
+            std::string cache_path = std::string(pAppData ? pAppData : "") + "\\Layuh\\login.cache";
+            if (pAppData) free(pAppData);
+            std::ifstream file(cache_path);
+            if (file) {
+                std::string saved_pw;
+                file >> saved_pw;
+                if (!saved_pw.empty() && _stricmp(saved_pw.c_str(), "deadlock") == 0) {
+                    logged_in = true; // Auto-login
+                }
+            }
+        }
+        
+        ImGui::SetCursorPosX(25);
+        ImGui::Text("Enter Key:");
+        ImGui::SetCursorPosX(25);
+        ImGui::PushItemWidth(300);
+        ImGui::InputText("##password", password_buf, sizeof(password_buf), ImGuiInputTextFlags_Password);
+        ImGui::PopItemWidth();
+        
+        ImGui::Spacing();
+        ImGui::SetCursorPosX(25);
+        ImGui::Checkbox("Remember me when I log out", &remember_me);
+        
+        ImGui::Spacing();
+        ImGui::SetCursorPosX(125);
+        if (ImGui::Button("Login", ImVec2(100, 30))) {
+            if (_stricmp(password_buf, "deadlock") == 0) {
+                logged_in = true;
+                failed = false;
+                if (remember_me) {
+                    char* pAppData = nullptr; size_t sz = 0;
+                    _dupenv_s(&pAppData, &sz, "LOCALAPPDATA");
+                    std::string cache_path = std::string(pAppData ? pAppData : "") + "\\Layuh\\login.cache";
+                    if (pAppData) free(pAppData);
+                    std::ofstream file(cache_path);
+                    if (file) file << password_buf;
+                }
+            } else {
+                failed = true;
+            }
+        }
+        
+        if (failed) {
+            ImGui::SetCursorPosX(ImGui::GetWindowSize().x / 2.0f - 40);
+            ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Invalid Key!");
+        }
+        
+        ImGui::End();
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor(2);
+        return true;
+    }
 
     if (!Layuh_preview) {
-        Layuh_preview = LoadTextureFromMemory2(dx_device, Layuh_bytes);
-        Layuh_preview_skeleton = LoadTextureFromMemory2(dx_device, Layuh_skeleton_bytes);
+        Layuh_preview = LoadTextureFromMemory2(g_pd3dDevice, Layuh_bytes);
+        Layuh_preview_skeleton = LoadTextureFromMemory2(g_pd3dDevice, Layuh_skeleton_bytes);
     }
 
     ImGui::SetNextWindowSize({ 665, 650 });
@@ -264,21 +355,45 @@ bool CMenu::draw_menu() {
     {
 
         std::string player_name = get_local_player_name();
-        ImGui::Text(oxorany("Kryptex Beta | https://discord.gg/StZUmwDQnJ |"));
+        ImGui::Text(oxorany("DeadLock Beta | https://discord.gg/StZUmwDQnJ |"));
         ImGui::Separator();
 
-        if (ImGui::Button(oxorany(("Aimbot")), ImVec2(130, 25))) current_tab = 0;
+        // Custom tabs with dark red tooltips on hover
+        auto icon_tab = [](const char* icon, const char* tooltip_text, int tab_idx) {
+            bool is_selected = (current_tab == tab_idx);
+            if (is_selected) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.09f, 0.60f, 1.0f)); // Purple active
+            else ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.1f, 0.11f, 0.15f, 1.0f)); // Dark background
+            
+            if (ImGui::Button(icon, ImVec2(130, 30))) current_tab = tab_idx;
+            
+            if (ImGui::IsItemHovered()) {
+                ImGui::BeginTooltip();
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.0f, 0.0f, 1.0f)); // Dark red text
+                ImGui::TextUnformatted(tooltip_text);
+                ImGui::PopStyleColor();
+                ImGui::EndTooltip();
+            }
+            ImGui::PopStyleColor();
+        };
+
+        // Stand-in generic text since we don't have exact Lucide unicode mapping available
+        // Person standing -> "ESP"
+        // Sword -> "Aim"
+        // Profile -> "Config"
+        // Misc -> "Misc"
+        icon_tab("ESP", "Player Visuals", 1);
         ImGui::SameLine(0, 0);
-        if (ImGui::Button(oxorany(("Visuals")), ImVec2(130, 25))) current_tab = 1;
+        icon_tab("AIM", "Aimbot Settings", 0);
         ImGui::SameLine(0, 0);
-        if (ImGui::Button(oxorany(("Exploits")), ImVec2(130, 25))) current_tab = 2;
+        icon_tab("MISC", "Miscellaneous", 2);
         ImGui::SameLine(0, 0);
-        if (ImGui::Button(oxorany(("Server List")), ImVec2(130, 25))) current_tab = 3;
+        icon_tab("SVR", "Server List", 3);
         ImGui::SameLine(0, 0);
-        if (ImGui::Button(oxorany(("Settings")), ImVec2(130, 25))) current_tab = 4;
+        icon_tab("CFG", "Configuration", 4);
 
         const float window_width = ImGui::GetContentRegionAvailWidth() - ImGui::GetStyle().WindowPadding.x;
         const float window_height = ImGui::GetContentRegionAvail().y - ImGui::GetStyle().WindowPadding.y;
+
 
         switch (current_tab) {
         case 0:

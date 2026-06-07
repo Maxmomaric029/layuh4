@@ -19,13 +19,12 @@
 #include < iostream >
 #include < cmath >
 #include < d3d11.h >
-#include <d3d9.h>
 #include < d3dcompiler.h >
 #include "kernel/driver.h"
 
 #include "cheat/utils/utils.h"
 #include "imgui.h"
-#include "imgui_impl_dx9.h"
+#include "imgui_impl_dx11.h"
 #include "imgui_impl_win32.h"
 #include "cheat/menu/ui/render/drawing/drawing.h"
 #include "cheat/menu/ui/render/overlay.h"
@@ -43,7 +42,7 @@
 
 #define M_PI   3.14159265358979323846264338327950288
 
-inline IDirect3DDevice9* dx_device = nullptr;
+inline ID3D11Device* dx_device = nullptr;
 
 inline ImFont* verdanaFont;
 inline ImFont* pixelFont;
@@ -291,47 +290,47 @@ namespace vars
     }
 }
 
-inline LPDIRECT3DTEXTURE9 workspace_image = nullptr;
-inline LPDIRECT3DTEXTURE9 part_image = nullptr;
-inline LPDIRECT3DTEXTURE9 model_image = nullptr;
-inline LPDIRECT3DTEXTURE9 camera_image = nullptr;
-inline LPDIRECT3DTEXTURE9 folder_image = nullptr;
-inline LPDIRECT3DTEXTURE9 local_script_image = nullptr;
-inline LPDIRECT3DTEXTURE9 script_image = nullptr;
-inline LPDIRECT3DTEXTURE9 humanoid_image = nullptr;
-inline LPDIRECT3DTEXTURE9 players_image = nullptr;
-inline LPDIRECT3DTEXTURE9 sound_image = nullptr;
-inline LPDIRECT3DTEXTURE9 accessory_image = nullptr;
-inline LPDIRECT3DTEXTURE9 hat_image = nullptr;
-inline LPDIRECT3DTEXTURE9 player_image = nullptr;
-inline LPDIRECT3DTEXTURE9 module_script_image = nullptr;
-inline LPDIRECT3DTEXTURE9 replicated_storage_image = nullptr;
-inline LPDIRECT3DTEXTURE9 run_service_image = nullptr;
-inline LPDIRECT3DTEXTURE9 spawn_location_image = nullptr;
-inline LPDIRECT3DTEXTURE9 replicated_first_image = nullptr;
-inline LPDIRECT3DTEXTURE9 starter_gui_image = nullptr;
-inline LPDIRECT3DTEXTURE9 starter_pack_image = nullptr;
-inline LPDIRECT3DTEXTURE9 starter_player_image = nullptr;
-inline LPDIRECT3DTEXTURE9 stats_image = nullptr;
-inline LPDIRECT3DTEXTURE9 chat_image = nullptr;
-inline LPDIRECT3DTEXTURE9 core_gui_image = nullptr;
-inline LPDIRECT3DTEXTURE9 gui_service_image = nullptr;
-inline LPDIRECT3DTEXTURE9 aim_image = nullptr;
-inline LPDIRECT3DTEXTURE9 visuals_image = nullptr;
-inline LPDIRECT3DTEXTURE9 misc_image = nullptr;
-inline LPDIRECT3DTEXTURE9 players_menu_image = nullptr;
-inline LPDIRECT3DTEXTURE9 config_image = nullptr;
-inline LPDIRECT3DTEXTURE9 lua_image = nullptr;
+inline ID3D11ShaderResourceView* workspace_image = nullptr;
+inline ID3D11ShaderResourceView* part_image = nullptr;
+inline ID3D11ShaderResourceView* model_image = nullptr;
+inline ID3D11ShaderResourceView* camera_image = nullptr;
+inline ID3D11ShaderResourceView* folder_image = nullptr;
+inline ID3D11ShaderResourceView* local_script_image = nullptr;
+inline ID3D11ShaderResourceView* script_image = nullptr;
+inline ID3D11ShaderResourceView* humanoid_image = nullptr;
+inline ID3D11ShaderResourceView* players_image = nullptr;
+inline ID3D11ShaderResourceView* sound_image = nullptr;
+inline ID3D11ShaderResourceView* accessory_image = nullptr;
+inline ID3D11ShaderResourceView* hat_image = nullptr;
+inline ID3D11ShaderResourceView* player_image = nullptr;
+inline ID3D11ShaderResourceView* module_script_image = nullptr;
+inline ID3D11ShaderResourceView* replicated_storage_image = nullptr;
+inline ID3D11ShaderResourceView* run_service_image = nullptr;
+inline ID3D11ShaderResourceView* spawn_location_image = nullptr;
+inline ID3D11ShaderResourceView* replicated_first_image = nullptr;
+inline ID3D11ShaderResourceView* starter_gui_image = nullptr;
+inline ID3D11ShaderResourceView* starter_pack_image = nullptr;
+inline ID3D11ShaderResourceView* starter_player_image = nullptr;
+inline ID3D11ShaderResourceView* stats_image = nullptr;
+inline ID3D11ShaderResourceView* chat_image = nullptr;
+inline ID3D11ShaderResourceView* core_gui_image = nullptr;
+inline ID3D11ShaderResourceView* gui_service_image = nullptr;
+inline ID3D11ShaderResourceView* aim_image = nullptr;
+inline ID3D11ShaderResourceView* visuals_image = nullptr;
+inline ID3D11ShaderResourceView* misc_image = nullptr;
+inline ID3D11ShaderResourceView* players_menu_image = nullptr;
+inline ID3D11ShaderResourceView* config_image = nullptr;
+inline ID3D11ShaderResourceView* lua_image = nullptr;
 
-inline LPDIRECT3DTEXTURE9 data_store_image = nullptr; // check
-inline LPDIRECT3DTEXTURE9 remote_event_image = nullptr; // check
-inline LPDIRECT3DTEXTURE9 remote_function_image = nullptr; // check
-inline LPDIRECT3DTEXTURE9 ui_list_layout_image = nullptr; // check
-inline LPDIRECT3DTEXTURE9 text_label_image = nullptr; // check
-inline LPDIRECT3DTEXTURE9 text_button_image = nullptr; // check
-inline LPDIRECT3DTEXTURE9 image_label_image = nullptr; // check
-inline LPDIRECT3DTEXTURE9 frame_image = nullptr; // check
-inline LPDIRECT3DTEXTURE9 billboard_gui_image = nullptr; // check
-inline LPDIRECT3DTEXTURE9 surface_gui_image = nullptr; // check
-inline LPDIRECT3DTEXTURE9 http_rbx_api_service_image = nullptr; // check
-inline LPDIRECT3DTEXTURE9 insert_service_image = nullptr; // check
+inline ID3D11ShaderResourceView* data_store_image = nullptr;
+inline ID3D11ShaderResourceView* remote_event_image = nullptr;
+inline ID3D11ShaderResourceView* remote_function_image = nullptr;
+inline ID3D11ShaderResourceView* ui_list_layout_image = nullptr;
+inline ID3D11ShaderResourceView* text_label_image = nullptr;
+inline ID3D11ShaderResourceView* text_button_image = nullptr;
+inline ID3D11ShaderResourceView* image_label_image = nullptr;
+inline ID3D11ShaderResourceView* frame_image = nullptr;
+inline ID3D11ShaderResourceView* billboard_gui_image = nullptr;
+inline ID3D11ShaderResourceView* surface_gui_image = nullptr;
+inline ID3D11ShaderResourceView* http_rbx_api_service_image = nullptr;
+inline ID3D11ShaderResourceView* insert_service_image = nullptr;

@@ -157,7 +157,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>ws2_32.lib;wldap32.lib;advapi32.lib;crypt32.lib;normaliz.lib;d3d9.lib;d3d11.lib;dxgi.lib;d3dcompiler.lib;zlib.lib;winhttp.lib;library_x64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;wldap32.lib;advapi32.lib;crypt32.lib;normaliz.lib;d3d11.lib;dxgi.lib;d3dcompiler.lib;zlib.lib;winhttp.lib;library_x64.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
       <AdditionalLibraryDirectories>..\Layuh\cheat\include\libs;..\Layuh\cheat\include\keyauth;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
@@ -175,7 +175,7 @@
     <ClCompile Include="cheat\menu\ui\imgui\imgui.cpp" />
     <ClCompile Include="cheat\menu\ui\imgui\imgui_demo.cpp" />
     <ClCompile Include="cheat\menu\ui\imgui\imgui_draw.cpp" />
-    <ClCompile Include="cheat\menu\ui\imgui\imgui_impl_dx9.cpp" />
+    <ClCompile Include="cheat\menu\ui\imgui\imgui_impl_dx11.cpp" />
     <ClCompile Include="cheat\menu\ui\imgui\imgui_impl_win32.cpp" />
     <ClCompile Include="cheat\menu\ui\imgui\imgui_widgets.cpp" />
     <ClCompile Include="cheat\menu\ui\render\drawing\drawing.cpp" />
@@ -203,7 +203,7 @@
     <ClInclude Include="cheat\menu\ui\imgui\images.hpp" />
     <ClInclude Include="cheat\menu\ui\imgui\imconfig.h" />
     <ClInclude Include="cheat\menu\ui\imgui\imgui.h" />
-    <ClInclude Include="cheat\menu\ui\imgui\imgui_impl_dx9.h" />
+    <ClInclude Include="cheat\menu\ui\imgui\imgui_impl_dx11.h" />
     <ClInclude Include="cheat\menu\ui\imgui\imgui_impl_win32.h" />
     <ClInclude Include="cheat\menu\ui\imgui\imgui_internal.h" />
     <ClInclude Include="cheat\menu\ui\imgui\imstb_rectpack.h" />

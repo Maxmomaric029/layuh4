@@ -60,7 +60,7 @@ bool custom::tab(const char* text, bool selected, ImFont* icon_font)
 
 
     ImGui::GetWindowDrawList()->AddRect(bb.Min, bb.Max, ImGui::GetColorU32(ImGuiCol_Border), 5.0f);
-    ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(bb.Min.x, bb.Min.y), ImVec2(bb.Min.x + size.x, bb.Min.y + size.y), ImColor(133, 3, 35, it_anim->second.active_anim), 5.0f);
+    ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(bb.Min.x, bb.Min.y), ImVec2(bb.Min.x + size.x, bb.Min.y + size.y), ImColor(90, 24, 154, it_anim->second.active_anim), 5.0f);
 
     ImVec2 textSize = ImGui::CalcTextSize(text);
 
@@ -172,7 +172,7 @@ bool custom::checkbox(const char* label, bool* v)
 
     window->DrawList->AddRectFilled(rect.Max - ImVec2(15, 15), rect.Max, ImGui::GetColorU32(ImGuiCol_FrameBg), 2.0f);
 
-    window->DrawList->AddRectFilled(rect.Max - ImVec2(15, 15), rect.Max, ImColor(133, 3, 35, it_anim->second.active_rect_alpha), 2.0f);
+    window->DrawList->AddRectFilled(rect.Max - ImVec2(15, 15), rect.Max, ImColor(90, 24, 154, it_anim->second.active_rect_alpha), 2.0f);
 
     ImGui::RenderCheckMark(rect.Max - ImVec2(12, 12), ImColor(255, 255, 255, it_anim->second.active_rect_alpha), 9.0f);
 
