@@ -210,6 +210,13 @@ void rescan_thread()
 // ─── Entry point ─────────────────────────────────────────────────────────────
 int main()
 {
+    // Allocate a console window so printf/cout work
+    AllocConsole();
+    FILE* f = nullptr;
+    freopen_s(&f, "CONOUT$", "w", stdout);
+    freopen_s(&f, "CONOUT$", "w", stderr);
+    freopen_s(&f, "CONIN$",  "r", stdin);
+    SetConsoleTitleA("DeadLock External");
     // 1. Auto-update offsets (version-cached, fast after first run)
     offsets::autoupdate();
 

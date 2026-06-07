@@ -11,6 +11,8 @@
 #include "../../cheat/render/ui_framework.h"
 
 #pragma comment (lib, "d3d11.lib")
+#pragma comment (lib, "dwmapi.lib")
+#pragma comment (lib, "d2d1.lib")
 
 ID3D11Device*               g_pd3dDevice = nullptr;  // non-static: extern'd by menu.cpp
 static ID3D11DeviceContext* g_pd3dDeviceContext = nullptr;
@@ -42,8 +44,11 @@ void overlay::render()
 {
     WNDCLASSEXW wc = { sizeof(wc) , CS_CLASSDC , wnd_proc , 0L , 0L , GetModuleHandle(nullptr) , nullptr , nullptr , nullptr , nullptr , oxorany(L"Task Manager") , nullptr };
     ::RegisterClassExW(&wc);
-    HWND hwnd = ::CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_TRANSPARENT, wc.lpszClassName, oxorany(L"Task Manager"), WS_POPUP,
-        0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), nullptr, nullptr, wc.hInstance, nullptr);
+    HWND hwnd = ::CreateWindowExW(
+        WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED,
+        wc.lpszClassName, oxorany(L"Task Manager"), WS_POPUP,
+        0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN),
+        nullptr, nullptr, wc.hInstance, nullptr);
 
     SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 255, LWA_ALPHA);
     MARGINS margin = { -1 };
@@ -67,6 +72,16 @@ void overlay::render()
 
     dx_device = g_pd3dDevice;
 
+    // Load embedded image assets (needs DX device)
+    image_handler.create_images();
+
+    // Menu starts visible — make window interactable immediately
+    {
+        LONG ex_style = GetWindowLong(hwnd, GWL_EXSTYLE);
+        ex_style &= ~WS_EX_TRANSPARENT;
+        SetWindowLong(hwnd, GWL_EXSTYLE, ex_style);
+    }
+
     float clear_color[4] = { 0.f, 0.f, 0.f, 0.f };
 
     bool done = false;
@@ -81,10 +96,12 @@ void overlay::render()
             if (overlay::enabled) {
                 SetForegroundWindow(hwnd);
                 SetFocus(hwnd);
+                // Make window receive input
                 LONG ex_style = GetWindowLong(hwnd, GWL_EXSTYLE);
                 ex_style &= ~WS_EX_TRANSPARENT;
                 SetWindowLong(hwnd, GWL_EXSTYLE, ex_style);
             } else {
+                // Pass input through to game
                 LONG ex_style = GetWindowLong(hwnd, GWL_EXSTYLE);
                 ex_style |= WS_EX_TRANSPARENT;
                 SetWindowLong(hwnd, GWL_EXSTYLE, ex_style);
