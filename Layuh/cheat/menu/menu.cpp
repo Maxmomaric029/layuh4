@@ -8,59 +8,72 @@
 
 bool logged_in = false;
 
-// Variables basicas para el arrastre de ventana del menu
 static float menu_x = 100.0f;
 static float menu_y = 100.0f;
-static float menu_w = 400.0f;
-static float menu_h = 300.0f;
+static int active_tab = 0;
 
-void CMenu::draw_keybinds() {
-    // Implementar si es necesario
-}
-
-void CMenu::draw_watermark() {
-    // Implementar si es necesario
-}
-
-void CMenu::draw_instance_tree(uintptr_t instance) {
-    // Implementar explorer en D2D si es necesario
-}
-
-void CMenu::draw_instance_explorer() {
-    // Implementar explorer en D2D si es necesario
-}
+void CMenu::draw_keybinds() {}
+void CMenu::draw_watermark() {}
+void CMenu::draw_instance_tree(uintptr_t instance) {}
+void CMenu::draw_instance_explorer() {}
 
 bool CMenu::draw_menu() {
     if (!ui::menu_open) return false;
 
     if (!logged_in) {
-        if (ui::begin_window("Login DeadLock", menu_x, menu_y, 300, 150)) {
-            ui::label("Por favor verifica tu acceso", menu_x + 20, menu_y + 50);
-            if (ui::button("Login (Auto)", menu_x + 20, menu_y + 90, 260, 30)) {
-                logged_in = true; // Auto login por ahora
+        ui::set_next_window_size(350, 200);
+        if (ui::begin_window("Login DeadLock", menu_x, menu_y)) {
+            ui::label("Verify your access token below:");
+            if (ui::button("Login with Auth", 310, 40)) {
+                logged_in = true;
             }
             ui::end_window();
         }
         return true;
     }
 
-    if (ui::begin_window("DeadLock - Puro DX11", menu_x, menu_y, menu_w, menu_h)) {
+    ui::set_next_window_size(650, 450);
+    if (ui::begin_window("DeadLock Premium", menu_x, menu_y)) {
         
-        float current_y = menu_y + 50.0f;
-        float x_offset = menu_x + 20.0f;
+        // Sidebar tabs
+        ui::begin_group_box("Navigation", 150, 360);
+        if (ui::tab("Aimbot", active_tab == 0, 120, 35)) active_tab = 0;
+        if (ui::tab("Visuals", active_tab == 1, 120, 35)) active_tab = 1;
+        if (ui::tab("Misc", active_tab == 2, 120, 35)) active_tab = 2;
+        ui::end_group_box();
 
-        ui::label("--- Aimbot ---", x_offset, current_y); current_y += 30.0f;
-        ui::checkbox("Enable Aimbot", vars::aimbot::aimbot_enabled, x_offset, current_y); current_y += 25.0f;
-        ui::checkbox("Draw FOV Circle", vars::aimbot::fov_circle, x_offset, current_y); current_y += 35.0f;
+        // Main content area
+        ui::set_cursor(menu_x + 190, menu_y + 65); // Move to right of sidebar
 
-        ui::label("--- Visuals ---", x_offset, current_y); current_y += 30.0f;
-        ui::checkbox("Enable ESP", vars::esp::box, x_offset, current_y); current_y += 25.0f;
-        ui::checkbox("Show Name", vars::esp::name, x_offset, current_y); current_y += 25.0f;
-        ui::checkbox("Show Distance", vars::esp::distance, x_offset, current_y); current_y += 35.0f;
-
-        ui::label("--- Misc ---", x_offset, current_y); current_y += 30.0f;
-        ui::checkbox("Fly Hack", vars::misc::fly_enabled, x_offset, current_y); current_y += 25.0f;
-        ui::checkbox("Speed Hack", vars::misc::speed_hack_enabled, x_offset, current_y); current_y += 25.0f;
+        if (active_tab == 0) {
+            ui::begin_group_box("Aimbot Settings", 420, 360);
+            ui::toggle("Enable Aimbot", vars::aimbot::aimbot_enabled);
+            ui::toggle("Draw FOV", vars::aimbot::fov_circle);
+            ui::toggle("Target Line", vars::aimbot::target_line);
+            ui::slider_float("FOV Size", vars::aimbot::fov_value, 10.0f, 500.0f);
+            ui::slider_float("Smoothness", vars::aimbot::smoothness, 1.0f, 10.0f);
+            ui::end_group_box();
+        } 
+        else if (active_tab == 1) {
+            ui::begin_group_box("ESP Settings", 420, 360);
+            ui::toggle("Master Switch", vars::esp::box);
+            ui::same_line(); ui::toggle("Filled Box", vars::esp::esp_fill_box);
+            ui::toggle("Show Name", vars::esp::name);
+            ui::same_line(); ui::toggle("Show Health", vars::esp::esp_health_bar);
+            ui::toggle("Show Distance", vars::esp::distance);
+            ui::toggle("Show Skeleton", vars::esp::esp_skeleton);
+            ui::slider_float("Render Distance", vars::esp::max_distance, 0.0f, 10000.0f);
+            ui::end_group_box();
+        }
+        else if (active_tab == 2) {
+            ui::begin_group_box("Miscellaneous", 420, 360);
+            ui::toggle("Fly Hack", vars::misc::fly_enabled);
+            ui::slider_int("Fly Speed", vars::misc::fly_speed, 1, 250);
+            ui::toggle("Speed Hack", vars::misc::speed_hack_enabled);
+            ui::slider_int("Walk Speed", vars::misc::speed_value, 16, 300);
+            ui::toggle("Infinite Jump", vars::misc::infinite_jump_enabled);
+            ui::end_group_box();
+        }
 
         ui::end_window();
     }
