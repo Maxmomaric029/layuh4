@@ -5,56 +5,19 @@
 #pragma comment(lib, "wininet.lib")
 #include "keyauth/utils.hpp"
 #include <iostream>
-#include "keyauth/auth.hpp"
+#include <string>
 
 void sessionStatus();
 
-using namespace KeyAuth;
-std::string name = oxorany("Astraxproducts's Application");
-std::string ownerid = oxorany("FyeaZV8G67");
-std::string version = oxorany("1.0");
-std::string url = oxorany("https://keyauth.win/api/1.3/"); 
-std::string path = oxorany("");
-api KeyAuthApp(name, ownerid, version, url, path);
-
-std::string readstring(std::uint64_t address)
-{
-    std::string string;
-    char character = 0;
-    int char_size = sizeof(character);
-    int offset = 0;
-
-    string.reserve(204);
-
-    while (offset < 200)
-    {
-        character = read<char>(address + offset);
-
-        if (character == 0)
-            break;
-
-        offset += char_size;
-        string.push_back(character);
-    }
-
-    return string;
-}
-
 void sessionStatus() {
-    KeyAuthApp.check(true);
-    if (!KeyAuthApp.response.success) {
+    std::string password;
+    std::cout << "Enter password: ";
+    std::cin >> password;
+    if (password != "deadlock") {
+        std::cout << "Invalid password. Exiting...\n";
         exit(0);
     }
-
-    if (KeyAuthApp.response.isPaid) {
-        while (true) {
-            Sleep(20000);
-            KeyAuthApp.check();
-            if (!KeyAuthApp.response.success) {
-                exit(0);
-            }
-        }
-    }
+    std::cout << "Access granted.\n";
 }
 
 struct Notification {
