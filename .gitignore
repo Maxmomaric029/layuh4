@@ -18,6 +18,10 @@ mono_crash.*
 
 # Build results
 build/
+
+# Corrupt DirectX SDK stub libs (replaced by CI via choco install directxsdk)
+Layuh/cheat/menu/ui/imgui/DirectX/Include/d3dx9.lib
+Layuh/cheat/menu/ui/imgui/DirectX/Include/d3dx9d.lib
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
