@@ -1186,7 +1186,7 @@ bool CAimbot::triggerbot(matrix view_matrix)
             continue;
 
         float health = read<float>(humanoid + offsets::Health);
-        if ((vars::aimbot::knock_check && health < vars::aimbot::minimum_knock_hp) || (health && health <= 0))
+        if ((vars::aimbot::knock_check && health < vars::aimbot::minimum_knock_hp) || health <= 0)
             continue;
 
         if (vars::aimbot::aimbot_method == 2)

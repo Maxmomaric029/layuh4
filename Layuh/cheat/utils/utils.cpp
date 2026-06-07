@@ -188,20 +188,16 @@ namespace utils {
         {
             children.clear();
             try {
-                auto start = read<uintptr_t>(instance_address + offsets::Children);
-                if (!start)
+                auto childStart = read<uintptr_t>(instance_address + offsets::Children);
+                if (!childStart)
                     return 0;
 
-                auto end = read<uintptr_t>(start + offsets::ChildrenEnd);
+                auto childEnd = read<uintptr_t>(childStart + offsets::ChildrenEnd);
 
-                auto childArray = read<uintptr_t>(start);
-                if (!childArray || childArray >= end)
-                    return 0;
-
-                for (uintptr_t current = childArray; current < end; current += 16)
+                for (auto addr = childStart; addr < childEnd; addr += 0x10)
                 {
-                    auto child_instance = read<uintptr_t>(current);
-                    if (!child_instance)
+                    auto child_instance = read<uintptr_t>(addr);
+                    if (!utils::is_valid_instance_address(child_instance))
                         continue;
                     std::string name = get_instance_name(child_instance);
                     children.emplace_back(child_instance, name);
@@ -239,19 +235,16 @@ namespace utils {
         {
             children.clear();
             try {
-                auto start = read<uintptr_t>(instance_address + offsets::Children);
-                if (!start)
+                auto childStart = read<uintptr_t>(instance_address + offsets::Children);
+                if (!childStart)
                     return 0;
 
-                auto end = read<uintptr_t>(start + offsets::ChildrenEnd);
-                auto childArray = read<uintptr_t>(start);
-                if (!childArray || childArray >= end)
-                    return 0;
+                auto childEnd = read<uintptr_t>(childStart + offsets::ChildrenEnd);
 
-                for (uintptr_t current = childArray; current < end; current += 16)
+                for (auto addr = childStart; addr < childEnd; addr += 0x10)
                 {
-                    auto child_instance = read<uintptr_t>(current);
-                    if (!child_instance)
+                    auto child_instance = read<uintptr_t>(addr);
+                    if (!utils::is_valid_instance_address(child_instance))
                         continue;
                     std::string classname = utils::get_instance_classname(child_instance);
                     children.emplace_back(child_instance, classname);
@@ -285,15 +278,20 @@ namespace utils {
         if (!instance_address)
             return container;
 
-        auto start = read<uintptr_t>(instance_address + offsets::Children);
+        auto childStart = read<uintptr_t>(instance_address + offsets::Children);
 
-        if (!start)
+        if (!childStart)
             return container;
 
-        auto end = read<uintptr_t>(start + offsets::ChildrenEnd);
+        auto childEnd = read<uintptr_t>(childStart + offsets::ChildrenEnd);
 
-        for (auto instances = read<uintptr_t>(start); instances != end; instances += 16)
-            container.emplace_back(read<uintptr_t>(instances));
+        // Iterate the child array from childStart to childEnd in 0x10 byte steps
+        for (auto addr = childStart; addr < childEnd; addr += 0x10)
+        {
+            auto child = read<uintptr_t>(addr);
+            if (utils::is_valid_instance_address(child))
+                container.push_back(child);
+        }
 
         return container;
     }
@@ -553,5 +551,15 @@ namespace utils {
             uintptr_t displayname_ptr = read<uintptr_t>(player + offsets::DisplayName);
             if (!displayname_ptr) return "Unknown";
             return utils::length_read_string(displayname_ptr);
+    }
+
+    bool is_valid_instance_address(uintptr_t address)
+    {
+        if (!address)
+            return false;
+        // Reject obviously invalid addresses (below 64KB or in kernel space)
+        if (address < 0x10000 || address >= 0x7FFFFFFF0000ULL)
+            return false;
+        return true;
     }
 }

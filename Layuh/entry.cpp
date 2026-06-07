@@ -108,12 +108,32 @@ void spinner_message(const char* message, int duration_ms = 2000, int interval_m
 auto base = 0;
 
 uint64_t GetDataModel() {
+    // Validate critical offsets before dereferencing
+    if (!offsets::TaskSchedulerPointer) {
+        printf(oxorany("[GetDataModel] ERROR: TaskSchedulerPointer offset is 0\n"));
+        return 0;
+    }
+    if (!offsets::FakeDataModelPointer) {
+        printf(oxorany("[GetDataModel] ERROR: FakeDataModelPointer offset is 0\n"));
+        return 0;
+    }
+    if (!offsets::FakeDataModelToDataModel) {
+        printf(oxorany("[GetDataModel] ERROR: FakeDataModelToDataModel offset is 0\n"));
+        return 0;
+    }
+
     uintptr_t scheduler = read<uintptr_t>(drv::GetBase() + offsets::TaskSchedulerPointer);
-    if (!scheduler) return 0;
+    if (!scheduler) {
+        utils::console_print_color(__FILE__, oxorany("TaskScheduler pointer is null, Roblox may not be ready"));
+        return 0;
+    }
 
     uintptr_t jobStart = read<uintptr_t>(scheduler + offsets::JobStart);
     uintptr_t jobEnd   = read<uintptr_t>(scheduler + offsets::JobEnd);
-    if (!jobStart || !jobEnd || jobStart >= jobEnd) return 0;
+    if (!jobStart || !jobEnd || jobStart >= jobEnd) {
+        utils::console_print_color(__FILE__, oxorany("Job list empty/invalid in scheduler"));
+        return 0;
+    }
 
     for (uintptr_t job = jobStart; job < jobEnd; job += 0x10) {
         uintptr_t jobAddress = read<uintptr_t>(job);
@@ -122,21 +142,37 @@ uint64_t GetDataModel() {
         std::string jobName = readstring(jobAddress + offsets::Job_Name);
         if (jobName == oxorany("RenderJob")) {
             auto RenderView = read<uintptr_t>(jobAddress + offsets::RenderJobToRenderView);
-            if (!RenderView) continue;
+            if (!RenderView) {
+                utils::console_print_color(__FILE__, oxorany("Found RenderJob but RenderView is null"));
+                continue;
+            }
 
             globals::visual_engine = read<uintptr_t>(RenderView + offsets::VisualEngine);
+            if (!globals::visual_engine)
+                utils::console_print_color(__FILE__, oxorany("RenderView found but VisualEngine is 0"));
+
             uintptr_t BaseAddr = drv::GetBase();
             uintptr_t FakeDataModel = read<uintptr_t>(BaseAddr + offsets::FakeDataModelPointer);
-            if (!FakeDataModel) continue;
+            if (!FakeDataModel) {
+                utils::console_print_color(__FILE__, oxorany("FakeDataModel pointer is null at base+offset"));
+                continue;
+            }
 
             auto realDataModel = static_cast<uintptr_t>(
                 read<std::uint64_t>(FakeDataModel + offsets::FakeDataModelToDataModel));
-            if (!realDataModel) continue;
+            if (!realDataModel) {
+                utils::console_print_color(__FILE__, oxorany("FakeDataModel found but DataModel deref is null"));
+                continue;
+            }
 
             globals::datamodel = realDataModel;
+            utils::console_print_success(__FILE__, oxorany("DataModel: %llx | VisualEngine: %llx"),
+                (unsigned long long)realDataModel,
+                (unsigned long long)globals::visual_engine);
             return jobAddress;
         }
     }
+    utils::console_print_color(__FILE__, oxorany("No RenderJob found in scheduler jobs"));
     return 0;
 }
 
@@ -260,19 +296,32 @@ int main()
     auto rbxBase   = drv::GetBase();
     auto rbxModule = drv::get_module(oxorany(L"RobloxPlayerBeta.dll"));
 
-    // Try to get DataModel (may fail if Roblox hasn't fully loaded - rescan_thread will retry)
-    GetDataModel();
+    // Try to get DataModel — retry a few times in case Roblox is still loading
+    printf(oxorany("Discovering DataModel...\n"));
+    for (int dm_attempt = 0; dm_attempt < 20 && !globals::datamodel; dm_attempt++) {
+        GetDataModel();
+        if (!globals::datamodel) {
+            printf(oxorany("  attempt %d/20: DataModel not ready yet, retrying in 500ms...\n"), dm_attempt + 1);
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+    }
 
     if (globals::datamodel) {
         auto place_id = read<std::uint64_t>(globals::datamodel + offsets::PlaceId);
-        globals::local_player = read<uintptr_t>(
-            utils::find_first_child_byclass(globals::datamodel, oxorany("Players"))
-            + offsets::LocalPlayer);
-        printf(oxorany("DataModel: %llx | LocalPlayer: %llx\n"), 
-            (unsigned long long)globals::datamodel, 
-            (unsigned long long)globals::local_player);
+        uintptr_t players = utils::find_first_child_byclass(globals::datamodel, oxorany("Players"));
+        if (players) {
+            globals::local_player = read<uintptr_t>(players + offsets::LocalPlayer);
+            utils::console_print_color(__FILE__, oxorany("Players service: %llx | LocalPlayer: %llx"),
+                (unsigned long long)players,
+                (unsigned long long)globals::local_player);
+        } else {
+            utils::console_print_color(__FILE__, oxorany("Players service not found under DataModel"));
+        }
+        printf(oxorany("DataModel: %llx | PlaceId: %llu\n"),
+            (unsigned long long)globals::datamodel,
+            (unsigned long long)place_id);
     } else {
-        printf(oxorany("DataModel not found (will retry in background)\n"));
+        printf(oxorany("DataModel not found after 20 retries (will continue retrying in background)\n"));
     }
 
     spinner_message(oxorany("Startup complete."), 800, 100);

@@ -209,4 +209,6 @@ namespace utils
     extern std::string get_decal_id(uintptr_t decal_instance);
 
     extern std::string get_instance_displayname(uintptr_t instance_address);
+
+    extern bool is_valid_instance_address(uintptr_t address);
 };

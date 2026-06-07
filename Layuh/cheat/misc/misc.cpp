@@ -13,15 +13,16 @@ std::vector<uintptr_t> GetChildren(uintptr_t self)
     std::vector<uintptr_t> container;
     if (!self)
         return container;
-    auto start = read<std::uint64_t>(self + offsets::Children);
-    if (!start)
+    auto childStart = read<uintptr_t>(self + offsets::Children);
+    if (!childStart)
         return container;
-    auto end = read<std::uint64_t>(start + offsets::ChildrenEnd);
-    if (!end)
+    auto childEnd = read<uintptr_t>(childStart + offsets::ChildrenEnd);
+    if (!childEnd)
         return container;
-    for (auto instances = read<std::uint64_t>(start); instances != end; instances += 16) {
-        if (instances > 1099511627776 && instances < 3298534883328) {
-            container.emplace_back(read<uintptr_t>(instances));
+    for (auto addr = childStart; addr < childEnd; addr += 0x10) {
+        auto child = read<uintptr_t>(addr);
+        if (utils::is_valid_instance_address(child)) {
+            container.emplace_back(child);
         }
     }
     return container;
