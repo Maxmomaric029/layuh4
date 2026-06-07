@@ -23,18 +23,12 @@
 #include "kernel/driver.h"
 
 #include "cheat/utils/utils.h"
-#include "imgui.h"
-#include "imgui_impl_dx11.h"
-#include "imgui_impl_win32.h"
 #include "cheat/menu/ui/render/drawing/drawing.h"
 #include "cheat/menu/ui/render/overlay.h"
 
 #include "cheat/globals/globals.h"
 #include "cheat/globals/roblox.h"
 #include <unordered_set>
-
-#include "imgui_internal.h"
-#define IMGUI_DEFINE_MATH_OPERATORS
 
 #define _sleep_for( ms ) std::this_thread::sleep_for( std::chrono::milliseconds( ms ) );
 #define return_null( ) return 0;
@@ -44,15 +38,10 @@
 
 inline ID3D11Device* dx_device = nullptr;
 
-inline ImFont* verdanaFont;
-inline ImFont* pixelFont;
-inline ImFont* menuSmallFont;
-inline ImFont* menuBigFont;
-
 inline std::unordered_set<uintptr_t> flagged_instances;
 
 void render_notifications();
-void notify(const std::string & message, ImVec4 color);
+void notify(const std::string & message, ImColor color);
 
 namespace vars
 {

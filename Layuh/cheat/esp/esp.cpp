@@ -269,25 +269,27 @@ bool CESP::draw_radar(matrix view_matrix)
     ImVec2 center = ImVec2(vars::esp::radar_pos_x + 100, vars::esp::radar_pos_y + 100);
     float radius = 100;
 
-    ImU32 inner_color = ImGui::GetColorU32(ImVec4(0.1f, 0.1f, 0.1f, 0.9f));
-    ImU32 line_color = ImGui::GetColorU32(ImVec4(vars::esp::radar_color.Value.x, vars::esp::radar_color.Value.y, vars::esp::radar_color.Value.z, vars::esp::radar_color.Value.w));
-    ImU32 circle_color = ImGui::GetColorU32(ImVec4(vars::esp::radar_color.Value.x, vars::esp::radar_color.Value.y, vars::esp::radar_color.Value.z, vars::esp::radar_color.Value.w));
-    ImU32 border_color = ImGui::GetColorU32(ImVec4(vars::esp::radar_color.Value.x, vars::esp::radar_color.Value.y, vars::esp::radar_color.Value.z, vars::esp::radar_color.Value.w));
+    ImColor inner_color = ImColor(25, 25, 25, 230);
+    ImColor line_color = vars::esp::radar_color;
+    ImColor circle_color = vars::esp::radar_color;
+    ImColor border_color = vars::esp::radar_color;
 
-    ImGui::GetOverlayDrawList()->AddCircleFilled(center, radius, inner_color, 64);
+    drawingapi::drawing.circle_filled(center, radius, inner_color);
 
-    float time = ImGui::GetTime();
+    float time = GetTickCount() / 1000.0f;
     float pulse_strength = (sinf(time * 2.0f) * 0.15f) + 0.85f;
-    ImU32 glow_color = ImGui::GetColorU32(ImVec4(vars::esp::radar_color.Value.x, vars::esp::radar_color.Value.y, vars::esp::radar_color.Value.z, 0.3f * pulse_strength));
+    
+    ImColor glow_color = vars::esp::radar_color;
+    glow_color.Value.w = 0.3f * pulse_strength;
 
-    ImGui::GetOverlayDrawList()->AddCircle(center, radius * pulse_strength, glow_color, 64, 2.0f);
-    ImGui::GetOverlayDrawList()->AddCircle(center, radius, border_color, 64, 1.5f);
+    drawingapi::drawing.circle(center, radius * pulse_strength, glow_color, 2.0f);
+    drawingapi::drawing.circle(center, radius, border_color, 1.5f);
 
     float range_circles[] = { 0.33f, 0.66f, 1.0f };
     for (int i = 0; i < 3; ++i)
     {
         float circle_radius = radius * range_circles[i];
-        ImGui::GetOverlayDrawList()->AddCircle(center, circle_radius, circle_color, 32, 1.0f);
+        drawingapi::drawing.circle(center, circle_radius, circle_color, 1.0f);
     }
 
     const int num_lines = 8;
@@ -298,15 +300,15 @@ bool CESP::draw_radar(matrix view_matrix)
         float angle = (3.14159f * 2.0f * i) / num_lines;
         ImVec2 start = ImVec2(center.x + cosf(angle) * (radius * 0.1f), center.y + sinf(angle) * (radius * 0.1f));
         ImVec2 end = ImVec2(center.x + cosf(angle) * radius, center.y + sinf(angle) * radius);
-        ImGui::GetOverlayDrawList()->AddLine(start, end, line_color, 1.0f);
+        drawingapi::drawing.line(start, end, line_color, 1.0f);
 
         ImVec2 text_pos = ImVec2(
-            center.x + cosf(angle) * (radius * 1.1f) - ImGui::CalcTextSize(directions[i]).x / 2,
-            center.y + sinf(angle) * (radius * 1.1f) - ImGui::CalcTextSize(directions[i]).y / 2
+            center.x + cosf(angle) * (radius * 1.1f) - 5,
+            center.y + sinf(angle) * (radius * 1.1f) - 5
         );
 
-        ImGui::GetOverlayDrawList()->AddText(ImVec2(text_pos.x + 1, text_pos.y + 1), IM_COL32(0, 0, 0, 255), directions[i]);
-        ImGui::GetOverlayDrawList()->AddText(text_pos, line_color, directions[i]);
+        drawingapi::drawing.text(directions[i], ImVec2(text_pos.x + 1, text_pos.y + 1), ImColor(0, 0, 0, 255));
+        drawingapi::drawing.text(directions[i], text_pos, line_color);
     }
 
     auto workspace = utils::find_first_child_byclass(globals::datamodel, "Workspace");
@@ -324,27 +326,6 @@ bool CESP::draw_radar(matrix view_matrix)
 
     float cone_width = 0.3f;
 
-    ImDrawList* draw_list = ImGui::GetOverlayDrawList();
-    draw_list->PathClear();
-    draw_list->PathLineTo(center);
-
-    const int segments = 12;
-    float step_angle = cone_width * 2.0f / segments;
-
-    for (int i = 0; i <= segments; i++) {
-        float segment_angle = camera_yaw - cone_width + step_angle * i;
-        float x = center.x + cosf(segment_angle) * radius;
-        float y = center.y + sinf(segment_angle) * radius;
-        draw_list->PathLineTo(ImVec2(x, y));
-    }
-
-    draw_list->PathFillConvex(ImGui::GetColorU32(ImVec4(
-        vars::esp::radar_color.Value.x, vars::esp::radar_color.Value.y, vars::esp::radar_color.Value.z, 0.15f * pulse_strength)));
-
-    ImU32 beam_color = ImGui::GetColorU32(ImVec4(
-        vars::esp::radar_color.Value.x, vars::esp::radar_color.Value.y, vars::esp::radar_color.Value.z, 0.5f * pulse_strength
-    ));
-
     ImVec2 left_beam = ImVec2(
         center.x + cosf(camera_yaw - cone_width) * radius,
         center.y + sinf(camera_yaw - cone_width) * radius
@@ -355,12 +336,19 @@ bool CESP::draw_radar(matrix view_matrix)
         center.y + sinf(camera_yaw + cone_width) * radius
     );
 
-    draw_list->AddLine(center, left_beam, beam_color, 1.5f);
-    draw_list->AddLine(center, right_beam, beam_color, 1.5f);
+    ImColor beam_color = vars::esp::radar_color;
+    beam_color.Value.w = 0.5f * pulse_strength;
+
+    drawingapi::drawing.line(center, left_beam, beam_color, 1.5f);
+    drawingapi::drawing.line(center, right_beam, beam_color, 1.5f);
+
+    ImColor fill_beam_color = vars::esp::radar_color;
+    fill_beam_color.Value.w = 0.15f * pulse_strength;
+    drawingapi::drawing.triangle_filled(center, left_beam, right_beam, fill_beam_color);
 
     float player_circle_radius = 4.0f;
-    ImU32 player_color = ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-    ImGui::GetOverlayDrawList()->AddCircleFilled(center, player_circle_radius, player_color, 12);
+    ImColor player_color = ImColor(255, 255, 255, 255);
+    drawingapi::drawing.circle_filled(center, player_circle_radius, player_color);
 
     auto get_part_position = [](uintptr_t character, const char* name) -> std::pair<Vector, bool>
         {
@@ -442,41 +430,40 @@ bool CESP::draw_radar(matrix view_matrix)
         float dot_size = 5.0f;
         ImColor player_dot_color = vars::esp::box_color;
 
-        ImGui::GetOverlayDrawList()->AddCircleFilled(
+        drawingapi::drawing.circle_filled(
             ImVec2((float)screen_x, (float)screen_y),
             dot_size,
-            player_dot_color,
-            8
+            player_dot_color
         );
 
         float glow_pulse = sinf(time * 3.0f + dist_to_player * 0.05f) * 0.7f;
-        ImGui::GetOverlayDrawList()->AddCircle(
+        ImColor glow_dot_color = player_dot_color;
+        glow_dot_color.Value.w = 0.5f * pulse_strength;
+
+        drawingapi::drawing.circle(
             ImVec2((float)screen_x, (float)screen_y),
             dot_size + 1.0f + glow_pulse,
-            ImGui::GetColorU32(ImVec4(player_dot_color.Value.x, player_dot_color.Value.y, player_dot_color.Value.z, 0.5f * pulse_strength)),
-            8,
+            glow_dot_color,
             1.0f
         );
 
         if (vars::esp::radar_show_names)
         {
             std::string player_name = utils::get_instance_name(player_instance);
-            ImVec2 name_size = ImGui::CalcTextSize(player_name.c_str());
-            ImVec2 name_pos = ImVec2((float)screen_x - name_size.x / 2, (float)screen_y - dot_size - name_size.y - 2);
+            ImVec2 name_pos = ImVec2((float)screen_x - 10, (float)screen_y - dot_size - 15 - 2);
 
-            draw_list->AddText(ImVec2(name_pos.x + 1, name_pos.y + 1), IM_COL32(0, 0, 0, 255), player_name.c_str());
-            draw_list->AddText(name_pos, vars::esp::radar_names_color, player_name.c_str());
+            drawingapi::drawing.text(player_name, ImVec2(name_pos.x + 1, name_pos.y + 1), ImColor(0, 0, 0, 255));
+            drawingapi::drawing.text(player_name, name_pos, vars::esp::radar_names_color);
         }
 
         if (vars::esp::radar_show_distance)
         {
             int distance = static_cast<int>(dist_to_player);
             std::string dist_text = std::to_string(distance) + "m";
-            ImVec2 dist_size = ImGui::CalcTextSize(dist_text.c_str());
-            ImVec2 dist_pos = ImVec2((float)screen_x - dist_size.x / 2, (float)screen_y + dot_size + 2);
+            ImVec2 dist_pos = ImVec2((float)screen_x - 10, (float)screen_y + dot_size + 2);
 
-            draw_list->AddText(ImVec2(dist_pos.x + 1, dist_pos.y + 1), IM_COL32(0, 0, 0, 255), dist_text.c_str());
-            draw_list->AddText(dist_pos, vars::esp::radar_distance_color, dist_text.c_str());
+            drawingapi::drawing.text(dist_text, ImVec2(dist_pos.x + 1, dist_pos.y + 1), ImColor(0, 0, 0, 255));
+            drawingapi::drawing.text(dist_text, dist_pos, vars::esp::radar_distance_color);
         }
 
         players_displayed++;
@@ -486,8 +473,8 @@ bool CESP::draw_radar(matrix view_matrix)
     {
         std::string debug_text = "Players: " + std::to_string(players_displayed);
         ImVec2 text_pos = ImVec2(vars::esp::radar_pos_x + 5, vars::esp::radar_pos_y + radius * 2 + 5);
-        draw_list->AddText(ImVec2(text_pos.x + 1, text_pos.y + 1), IM_COL32(0, 0, 0, 255), debug_text.c_str());
-        draw_list->AddText(text_pos, ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)), debug_text.c_str());
+        drawingapi::drawing.text(debug_text, ImVec2(text_pos.x + 1, text_pos.y + 1), ImColor(0, 0, 0, 255));
+        drawingapi::drawing.text(debug_text, text_pos, ImColor(255, 255, 255, 255));
     }
 
     return true;
@@ -509,8 +496,7 @@ bool CESP::DrawArrow(ImVec2 center, Vector2D targetScreenPos, float radius, ImCo
     ImVec2 p2(arrowPos.x - arrowSize * cosf(angle - 0.5f), arrowPos.y - arrowSize * sinf(angle - 0.5f));
     ImVec2 p3(arrowPos.x - arrowSize * cosf(angle + 0.5f), arrowPos.y - arrowSize * sinf(angle + 0.5f));
 
-    ImDrawList* draw_list = ImGui::GetOverlayDrawList();
-    draw_list->AddTriangleFilled(p1, p2, p3, color);
+    drawingapi::drawing.triangle_filled(p1, p2, p3, color);
 
     return true;
 }
@@ -721,12 +707,11 @@ bool CESP::draw_players(matrix view_matrix)
             );
             drawingapi::drawing.filled_box(health_bar_top_right, health_bar_bottom_left, health_bar_color);
             std::string health_text = std::to_string(static_cast<int>(health));
-            ImVec2 text_size = ImGui::CalcTextSize(health_text.c_str());
+            ImVec2 text_size(20.0f, 15.0f); // Approximate size
             ImVec2 health_text_pos(
                 health_bar_bottom_left.x + (health_bar_width - text_size.x) * 0.5f,
                 health_bar_top_right.y - (text_size.y * 0.5f)
             );
-            ImGui::PushFont(pixelFont);
             if (vars::esp::esp_health_text && static_cast<int>(health) != 100)
             {
                 drawingapi::drawing.text(health_text, health_text_pos, vars::esp::health_text_color);
@@ -736,8 +721,7 @@ bool CESP::draw_players(matrix view_matrix)
         {
             if (!player_name.empty())
             {
-                ImGui::PushFont(verdanaFont);
-                ImVec2 text_size = ImGui::CalcTextSize(player_name.c_str());
+                ImVec2 text_size(player_name.length() * 8.0f, 15.0f); // Approximate
                 float text_x = head_screen.x - (text_size.x / 2);
                 float text_y = head_screen.y - 15;
                 drawingapi::drawing.text(player_name.c_str(), ImVec2(text_x, text_y), name_color);
@@ -762,8 +746,7 @@ bool CESP::draw_players(matrix view_matrix)
                         if (distance > 0.0f)
                         {
                             std::string distance_str = "" + std::to_string(static_cast<int>(distance)) + "m";
-                            ImGui::PushFont(pixelFont);
-                            ImVec2 dist_text_size = ImGui::CalcTextSize(distance_str.c_str());
+                            ImVec2 dist_text_size(distance_str.length() * 8.0f, 15.0f); // Approximate
                             float dist_text_x = (box_top_left.x + box_bottom_right.x) / 2 - (dist_text_size.x / 2);
                             float dist_text_y = box_bottom_right.y + 2;
                             drawingapi::drawing.text(distance_str.c_str(), ImVec2(dist_text_x, dist_text_y), distance_color);
@@ -802,8 +785,7 @@ bool CESP::draw_players(matrix view_matrix)
         std::string player_name = utils::get_instance_name(globals::teleport_target);
         if (player_name.empty())
             return true;
-        ImGui::PushFont(verdanaFont);
-        ImVec2 text_size = ImGui::CalcTextSize(player_name.c_str());
+        ImVec2 text_size(player_name.length() * 8.0f, 15.0f);
         Vector head_pos;
         Vector2D head_screen;
         bool head_valid = false;
@@ -832,25 +814,21 @@ bool CESP::draw_players(matrix view_matrix)
         ImVec2 arrow_base_left(head_screen.x - arrow_size, name_text_y);
         ImVec2 arrow_base_right(head_screen.x + arrow_size, name_text_y);
         const float outline_thickness = 2.0f;
-        ImDrawList* draw_list = ImGui::GetOverlayDrawList();
-        if (draw_list)
-        {
-            draw_list->AddTriangleFilled(
-                arrow_tip,
-                arrow_base_left,
-                arrow_base_right,
-                IM_COL32(0, 0, 0, 255)
-            );
-            ImVec2 inner_tip(head_screen.x, name_text_y + arrow_size - outline_thickness);
-            ImVec2 inner_base_left(head_screen.x - arrow_size + outline_thickness, name_text_y + outline_thickness);
-            ImVec2 inner_base_right(head_screen.x + arrow_size - outline_thickness, name_text_y + outline_thickness);
-            draw_list->AddTriangleFilled(
-                inner_tip,
-                inner_base_left,
-                inner_base_right,
-                vars::misc::teleport_arrow_color
-            );
-        }
+        drawingapi::drawing.triangle_filled(
+            arrow_tip,
+            arrow_base_left,
+            arrow_base_right,
+            ImColor(0, 0, 0, 255)
+        );
+        ImVec2 inner_tip(head_screen.x, name_text_y + arrow_size - outline_thickness);
+        ImVec2 inner_base_left(head_screen.x - arrow_size + outline_thickness, name_text_y + outline_thickness);
+        ImVec2 inner_base_right(head_screen.x + arrow_size - outline_thickness, name_text_y + outline_thickness);
+        drawingapi::drawing.triangle_filled(
+            inner_tip,
+            inner_base_left,
+            inner_base_right,
+            vars::misc::teleport_arrow_color
+        );
     }
     return true;
 }

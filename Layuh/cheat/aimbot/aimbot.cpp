@@ -981,10 +981,7 @@ bool CAimbot::aim_at_closest_player(matrix view_matrix)
     if (!utils::world_to_screen(pos, screen_pos, view_matrix, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN))) return false;
 
     if (vars::aimbot::target_line) {
-        ImDrawList* draw_list = ImGui::GetOverlayDrawList();
-        ImVec2 cursor_pos(static_cast<float>(cursor.x), static_cast<float>(cursor.y));
-        ImVec2 target_pos(screen_pos.x, screen_pos.y);
-        draw_list->AddLine(cursor_pos, target_pos, vars::aimbot::target_line_color, 1.5f);
+        render::draw_line(static_cast<float>(cursor.x), static_cast<float>(cursor.y), screen_pos.x, screen_pos.y, vars::aimbot::target_line_color, 1.5f);
     }
 
     if (vars::aimbot::aimbot_method == 0)

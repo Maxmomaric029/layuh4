@@ -28,7 +28,7 @@ std::string readstring(std::uint64_t address)
 // ─── Notification system ─────────────────────────────────────────────────────
 struct Notification {
     std::string message;
-    ImVec4 color;
+    ImColor color;
     float creation_time;
     float duration;
     float alpha;
@@ -46,91 +46,45 @@ private:
     float animation_speed = 500.0f;
 
 public:
-    void add_notification(const std::string& message, ImVec4 color = ImVec4(1,1,1,1), float duration = 3.0f) {
+    void add_notification(const std::string& message, ImColor color = ImColor(255,255,255,255), float duration = 3.0f) {
         Notification n;
         n.message = message; n.color = color;
-        n.creation_time = ImGui::GetTime(); n.duration = duration;
+        n.creation_time = GetTickCount() / 1000.0f; n.duration = duration;
         n.alpha = 0.0f; n.y_offset = 0.0f; n.removing = false;
         notifications.push_back(n);
     }
 
     void render() {
         if (notifications.empty()) return;
-        float current_time = ImGui::GetTime();
-        ImVec2 screen_size = ImGui::GetIO().DisplaySize;
-        float current_height = screen_size.y - margin;
-        ImDrawList* draw_list = ImGui::GetOverlayDrawList();
+        float current_time = GetTickCount() / 1000.0f;
+        float screen_w = (float)GetSystemMetrics(SM_CXSCREEN);
+        float current_height = (float)GetSystemMetrics(SM_CYSCREEN) - margin;
 
         for (int i = (int)notifications.size() - 1; i >= 0; i--) {
             auto& notif = notifications[i];
             float elapsed = current_time - notif.creation_time;
 
-            if (elapsed > notif.duration && !notif.removing)
-                notif.removing = true;
-
-            if (notif.removing) {
-                notif.alpha = ImMax(0.0f, notif.alpha - ImGui::GetIO().DeltaTime / fade_out_time);
-                notif.y_offset += ImGui::GetIO().DeltaTime * animation_speed;
-                if (notif.alpha <= 0.0f) { notifications.erase(notifications.begin() + i); continue; }
-            } else {
-                notif.alpha = ImMin(1.0f, elapsed / fade_in_time);
-                notif.y_offset = ImMax(0.0f, notif.y_offset - ImGui::GetIO().DeltaTime * animation_speed);
+            if (elapsed > notif.duration) {
+                notifications.erase(notifications.begin() + i); 
+                continue; 
             }
 
-            ImVec2 text_size = ImGui::CalcTextSize(notif.message.c_str());
+            ImVec2 text_size(notif.message.length() * 8.0f, 15.0f);
             float width = text_size.x + padding * 2;
-            float max_width = screen_size.x * 0.3f;
+            float height = text_size.y + padding * 2;
+            ImVec2 wp(screen_w - width - margin, current_height - height);
 
-            if (width > max_width) {
-                width = max_width;
-                ImVec2 text_size_wrapped;
-                float wrap_width = max_width - padding * 2;
-                float wrap_spacing = 4.0f;
-                const char* text_begin = notif.message.c_str();
-                const char* text_end = text_begin + notif.message.length();
-                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, wrap_spacing));
-                text_size_wrapped = ImGui::CalcTextSize(oxorany("A"));
-                float line_height = text_size_wrapped.y + wrap_spacing;
-                int line_count = 1;
-                float line_width = 0.0f;
-                for (const char* s = text_begin; s < text_end; s++) {
-                    char c = *s;
-                    if (c == '\n') { line_count++; line_width = 0; }
-                    else {
-                        line_width += ImGui::CalcTextSize(&c, &c + 1).x;
-                        if (line_width > wrap_width) { line_count++; line_width = 0; }
-                    }
-                }
-                ImGui::PopStyleVar();
-                float height = line_count * line_height + padding * 2;
-                ImVec2 wp(screen_size.x - width - margin + notif.y_offset, current_height - height);
-                draw_list->AddRectFilled(ImVec2(wp.x+2,wp.y+2), ImVec2(wp.x+width+2,wp.y+height+2), ImColor(0.f,0.f,0.f,notif.alpha*0.25f), 4.f);
-                draw_list->AddRectFilled(wp, ImVec2(wp.x+width,wp.y+height), ImColor(0.08f,0.08f,0.08f,notif.alpha*0.9f), 4.f);
-                draw_list->AddRect(wp, ImVec2(wp.x+width,wp.y+height), ImColor(0.3f,0.3f,0.3f,notif.alpha), 4.f, 0, 1.5f);
-                draw_list->AddRectFilled(wp, ImVec2(wp.x+3.f,wp.y+height), ImColor(0.f,0.74f,0.76f,notif.alpha));
-                ImGui::PushClipRect(wp, ImVec2(wp.x+width,wp.y+height), true);
-                ImGui::PushTextWrapPos(wp.x + width - padding);
-                draw_list->AddText(ImVec2(wp.x+padding,wp.y+padding), ImColor(notif.color.x,notif.color.y,notif.color.z,notif.alpha), notif.message.c_str());
-                ImGui::PopTextWrapPos();
-                ImGui::PopClipRect();
-                current_height -= (height + margin);
-            } else {
-                float height = text_size.y + padding * 2;
-                ImVec2 wp(screen_size.x - width - margin + notif.y_offset, current_height - height);
-                draw_list->AddRectFilled(ImVec2(wp.x+2,wp.y+2), ImVec2(wp.x+width+2,wp.y+height+2), ImColor(0.f,0.f,0.f,notif.alpha*0.25f), 4.f);
-                draw_list->AddRectFilled(wp, ImVec2(wp.x+width,wp.y+height), ImColor(0.08f,0.08f,0.08f,notif.alpha*0.9f), 4.f);
-                draw_list->AddRect(wp, ImVec2(wp.x+width,wp.y+height), ImColor(0.3f,0.3f,0.3f,notif.alpha), 4.f, 0, 1.5f);
-                draw_list->AddRectFilled(wp, ImVec2(wp.x+3.f,wp.y+height), ImColor(0.f,0.74f,0.76f,notif.alpha));
-                draw_list->AddText(ImVec2(wp.x+padding,wp.y+padding), ImColor(notif.color.x,notif.color.y,notif.color.z,notif.alpha), notif.message.c_str());
-                current_height -= (height + margin);
-            }
+            drawingapi::drawing.filled_box(wp, ImVec2(wp.x+width, wp.y+height), ImColor(0, 0, 0, 200));
+            drawingapi::drawing.text(notif.message, ImVec2(wp.x+padding, wp.y+padding), notif.color);
+
+            current_height -= (height + margin);
         }
     }
 };
 
 inline NotificationSystem g_notification_system;
 
-void notify(const std::string& message, ImVec4 color) {
+void notify(const std::string& message, ImColor color) {
     g_notification_system.add_notification(message, color, 5.0f);
 }
 void render_notifications() {
@@ -251,11 +205,11 @@ void rescan_thread()
     }
 }
 
+#pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
+
 // ─── Entry point ─────────────────────────────────────────────────────────────
 int main()
 {
-    utils::initialize_console();
-
     // 1. Auto-update offsets (version-cached, fast after first run)
     offsets::autoupdate();
 
