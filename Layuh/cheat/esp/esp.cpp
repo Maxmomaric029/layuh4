@@ -807,7 +807,7 @@ bool CESP::draw_players(matrix view_matrix)
         }
         if (!head_valid)
             return true;
-        float name_margin = max(15.0f, text_size.y * 1.5f);
+        float name_margin = std::max(15.0f, text_size.y * 1.5f);
         float name_text_y = head_screen.y - name_margin;
         const float arrow_size = 11.0f;
         ImVec2 arrow_tip(head_screen.x, name_text_y + arrow_size);
