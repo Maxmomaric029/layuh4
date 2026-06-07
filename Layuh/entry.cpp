@@ -258,7 +258,7 @@ int main()
 
     // Retry DataModel a few times if not ready yet
     if (!GetDataModel()) {
-        printf("DataModel not ready, retrying...\n");
+        printf(oxorany("DataModel not ready, retrying...\n"));
         for (int i = 0; i < 30 && !globals::datamodel; i++) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             GetDataModel();
