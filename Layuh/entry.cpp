@@ -257,28 +257,19 @@ int main()
     auto rbxBase   = drv::GetBase();
     auto rbxModule = drv::get_module(oxorany(L"RobloxPlayerBeta.dll"));
 
-    // Retry DataModel a few times if not ready yet
-    if (!GetDataModel()) {
-        printf(oxorany("DataModel not ready, retrying...\n"));
-        for (int i = 0; i < 30 && !globals::datamodel; i++) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            GetDataModel();
-        }
-    }
+    // Try to get DataModel (may fail if Roblox hasn't fully loaded - rescan_thread will retry)
+    GetDataModel();
 
     if (globals::datamodel) {
         auto place_id = read<std::uint64_t>(globals::datamodel + offsets::PlaceId);
-        auto players_service = utils::find_first_child_byclass(globals::datamodel, oxorany("Players"));
-        if (players_service) {
-            // Retry LocalPlayer - might not be in game yet
-            int lp_attempts = 0;
-            while (lp_attempts < 30) {
-                globals::local_player = read<uintptr_t>(players_service + offsets::LocalPlayer);
-                if (globals::local_player) break;
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                lp_attempts++;
-            }
-        }
+        globals::local_player = read<uintptr_t>(
+            utils::find_first_child_byclass(globals::datamodel, oxorany("Players"))
+            + offsets::LocalPlayer);
+        printf(oxorany("DataModel: %llx | LocalPlayer: %llx\n"), 
+            (unsigned long long)globals::datamodel, 
+            (unsigned long long)globals::local_player);
+    } else {
+        printf(oxorany("DataModel not found (will retry in background)\n"));
     }
 
     spinner_message(oxorany("Startup complete."), 800, 100);

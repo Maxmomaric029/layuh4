@@ -184,7 +184,7 @@ namespace utils {
         auto& children = cache[instance_address];
         auto& update_time = last_update[instance_address];
 
-        if (children.empty() || now - update_time > std::chrono::seconds(2))
+        if (children.empty() || now - update_time > std::chrono::milliseconds(1900)) // Slightly less than 2s to avoid race conditions
         {
             children.clear();
             try {
@@ -235,7 +235,7 @@ namespace utils {
         auto& children = cache[instance_address];
         auto& update_time = last_update[instance_address];
 
-        if (children.empty() || now - update_time > std::chrono::seconds(2))
+        if (children.empty() || now - update_time > std::chrono::milliseconds(1900)) // Slightly less than 2s to avoid race conditions
         {
             children.clear();
             try {
