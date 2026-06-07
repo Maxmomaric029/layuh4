@@ -210,7 +210,7 @@ namespace utils {
             catch (...) {
                 return 0;
             }
-            update_time = now;
+            if (!children.empty()) update_time = now; // Only cache when children exist
         }
 
         for (const auto& [child_instance, name] : children)
