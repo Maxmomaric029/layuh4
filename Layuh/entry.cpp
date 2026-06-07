@@ -180,7 +180,8 @@ void rescan_thread()
         std::uint64_t current_place_id = read<std::uint64_t>(datamodel + offsets::PlaceId);
         if (current_place_id == 0) continue;
 
-        if (datamodel != globals::datamodel || current_place_id != last_place_id)
+        // Re-init when datamodel changes, place changes, OR local_player is still 0
+        if (datamodel != globals::datamodel || current_place_id != last_place_id || !globals::local_player)
         {
             drv::procid = drv::FindProcess(oxorany("RobloxPlayerBeta.exe"));
             drv::GetBase();
@@ -269,7 +270,14 @@ int main()
         auto place_id = read<std::uint64_t>(globals::datamodel + offsets::PlaceId);
         auto players_service = utils::find_first_child_byclass(globals::datamodel, oxorany("Players"));
         if (players_service) {
-            globals::local_player = read<uintptr_t>(players_service + offsets::LocalPlayer);
+            // Retry LocalPlayer - might not be in game yet
+            int lp_attempts = 0;
+            while (lp_attempts < 30) {
+                globals::local_player = read<uintptr_t>(players_service + offsets::LocalPlayer);
+                if (globals::local_player) break;
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                lp_attempts++;
+            }
         }
     }
 

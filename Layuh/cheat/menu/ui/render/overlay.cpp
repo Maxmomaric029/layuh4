@@ -242,8 +242,9 @@ void cleanup_render_target()
 LRESULT WINAPI wnd_proc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     if (ui::menu_open) {
+        // Block game input when menu is open
         if (msg == WM_LBUTTONDOWN || msg == WM_LBUTTONUP || msg == WM_RBUTTONDOWN || msg == WM_RBUTTONUP || msg == WM_MOUSEMOVE) {
-            return 1; // Block game input when menu is open
+            // return 1; // Uncomment to block game input when menu is open
         }
     }
 
