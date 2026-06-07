@@ -74,7 +74,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)build\</OutDir>
     <IntDir>$(SolutionDir)build\intermediates\</IntDir>
-    <LibraryPath>$(ProjectDir)cheat\menu\ui\imgui\DirectX\Include;$(ProjectDir)cheat\include\libs;$(ProjectDir)cheat\include\keyauth;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(ProjectDir)cheat\include\libs;$(ProjectDir)cheat\include\keyauth;$(LibraryPath)</LibraryPath>
     <IncludePath>$(ProjectDir)cheat\menu\ui\imgui\DirectX\Include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -94,7 +94,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>d3d11.lib;dxgi.lib;d3dcompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>..\Layuh\cheat\menu\ui\imgui\DirectX\Include;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -159,7 +159,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>ws2_32.lib;wldap32.lib;advapi32.lib;crypt32.lib;normaliz.lib;d3d11.lib;dxgi.lib;d3dcompiler.lib;zlib.lib;library_x64.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
-      <AdditionalLibraryDirectories>..\Layuh\cheat\include\libs;..\Layuh\cheat\include\keyauth;..\Layuh\cheat\menu\ui\imgui\DirectX\Include;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\Layuh\cheat\include\libs;..\Layuh\cheat\include\keyauth;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

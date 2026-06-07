@@ -34,8 +34,8 @@
 #include <set>
 #pragma comment(lib, "dwmapi.lib")
 #pragma comment(lib, "winhttp.lib")
-#pragma warning(disable : C4267)
-#pragma warning(disable : C4244)
+#pragma warning(disable : 4267)
+#pragma warning(disable : 4244)
 
 
 static char prediction_factor_buf[32] = "";
