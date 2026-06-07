@@ -1801,7 +1801,7 @@ uintptr_t selected_instance = 0;
 void CMenu::draw_instance_tree(uintptr_t instance)
 {
     refreshCache();
-    std::unordered_map<std::string, LPDIRECT3DTEXTURE9> class_icons = {
+    std::unordered_map<std::string, ID3D11ShaderResourceView*> class_icons = {
         {oxorany("Workspace"), workspace_image},
         {oxorany("Part"), part_image},
         {oxorany("MeshPart"), part_image},

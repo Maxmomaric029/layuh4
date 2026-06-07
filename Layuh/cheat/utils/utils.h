@@ -69,7 +69,7 @@ public:
     }
 };
 
-static struct Matrix3 final {
+struct Matrix3 final {
     float data[9];
 };
 
