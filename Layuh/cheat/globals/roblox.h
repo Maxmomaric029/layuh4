@@ -333,6 +333,13 @@ namespace offsets
                         return fields[field].get<uintptr_t>();
                 return 0;
             };
+            // Helper: lookup a specific class + field (for short names like "Pointer" inside "FakeDataModel")
+            auto geto_in = [&](const char* cls, const char* field) -> uintptr_t {
+                auto it = om.find(cls);
+                if (it != om.end() && it->is_object() && it->contains(field))
+                    return (*it)[field].get<uintptr_t>();
+                return 0;
+            };
 #define APPLY_N(n) n = geto(#n)
             APPLY_N(Adornee); APPLY_N(Anchored); APPLY_N(AnimationId);
             APPLY_N(AttributeList); APPLY_N(AttributeToNext); APPLY_N(AttributeToValue);
@@ -392,6 +399,18 @@ namespace offsets
             APPLY_N(WhitelistedPages); APPLY_N(WhitelistedThreads);
             APPLY_N(Workspace); APPLY_N(viewmatrix);
 #undef APPLY_N
+
+            // ── Second pass: try class-specific short names ──
+            // If the flat name wasn't found (still 0), try "ClassName::FieldName" format
+            if (!FakeDataModelPointer) FakeDataModelPointer   = geto_in("FakeDataModel", "Pointer");
+            if (!FakeDataModelToDataModel) FakeDataModelToDataModel = geto_in("FakeDataModel", "RealDataModel");
+            if (!RenderJobToRenderView) RenderJobToRenderView = geto_in("RenderJob", "RenderView");
+            if (!RenderJobToDataModel) RenderJobToDataModel   = geto_in("RenderJob", "RealDataModel");
+            if (!RenderJobToFakeDataModel) RenderJobToFakeDataModel = geto_in("RenderJob", "FakeDataModel");
+            if (!VisualEnginePointer) VisualEnginePointer     = geto_in("VisualEngine", "Pointer");
+            if (!VisualEngine) VisualEngine                   = geto_in("VisualEngine", "RenderView");
+            if (!viewmatrix) viewmatrix                       = geto_in("VisualEngine", "ViewMatrix");
+            if (!Dimensions) Dimensions                       = geto_in("VisualEngine", "Dimensions");
         }
         else
         {
