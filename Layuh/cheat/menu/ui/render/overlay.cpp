@@ -123,10 +123,12 @@ void overlay::render()
 
         if (g_resizeWidth != 0 && g_resizeHeight != 0)
         {
+            render::cleanup_render_target();
             cleanup_render_target();
             g_pSwapChain->ResizeBuffers(0, g_resizeWidth, g_resizeHeight, DXGI_FORMAT_UNKNOWN, 0);
             g_resizeWidth = g_resizeHeight = 0;
             create_render_target();
+            render::create_render_target(g_pSwapChain);
         }
 
         ui::update_input(hwnd);
@@ -183,7 +185,7 @@ bool create_device_d3d(HWND hWnd)
     sd.Windowed = TRUE;
     sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
 
-    UINT createDeviceFlags = 0;
+    UINT createDeviceFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
     D3D_FEATURE_LEVEL featureLevel;
     const D3D_FEATURE_LEVEL featureLevelArray[2] = { D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_0, };
     if (D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, createDeviceFlags, featureLevelArray, 2, D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext) != S_OK)

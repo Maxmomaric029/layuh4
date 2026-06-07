@@ -21,6 +21,9 @@ namespace render {
     bool initialize(IDXGISwapChain* swapChain);
     void cleanup();
 
+    bool create_render_target(IDXGISwapChain* swapChain);
+    void cleanup_render_target();
+
     // Empieza y termina los dibujos de un frame
     void begin_frame();
     void end_frame();

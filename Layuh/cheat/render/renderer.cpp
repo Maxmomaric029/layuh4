@@ -20,21 +20,7 @@ namespace render {
         );
         if (FAILED(hr)) return false;
 
-        // Obtener el back buffer del swapchain (como DXGISurface)
-        IDXGISurface* dxgiBackBuffer = nullptr;
-        hr = swapChain->GetBuffer(0, IID_PPV_ARGS(&dxgiBackBuffer));
-        if (FAILED(hr)) return false;
-
-        // Crear el render target de D2D sobre el DXGISurface
-        D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(
-            D2D1_RENDER_TARGET_TYPE_DEFAULT,
-            D2D1::PixelFormat(DXGI_FORMAT_UNKNOWN, D2D1_ALPHA_MODE_PREMULTIPLIED)
-        );
-
-        hr = d2dFactory->CreateDxgiSurfaceRenderTarget(dxgiBackBuffer, &props, &d2dRenderTarget);
-        dxgiBackBuffer->Release();
-        
-        if (FAILED(hr)) return false;
+        if (!create_render_target(swapChain)) return false;
 
         // Crear un formato de texto por defecto (Segoe UI)
         hr = dWriteFactory->CreateTextFormat(
@@ -54,8 +40,28 @@ namespace render {
     void cleanup() {
         if (textFormat) { textFormat->Release(); textFormat = nullptr; }
         if (dWriteFactory) { dWriteFactory->Release(); dWriteFactory = nullptr; }
-        if (d2dRenderTarget) { d2dRenderTarget->Release(); d2dRenderTarget = nullptr; }
+        cleanup_render_target();
         if (d2dFactory) { d2dFactory->Release(); d2dFactory = nullptr; }
+    }
+
+    bool create_render_target(IDXGISwapChain* swapChain) {
+        if (!d2dFactory) return false;
+        IDXGISurface* dxgiBackBuffer = nullptr;
+        HRESULT hr = swapChain->GetBuffer(0, IID_PPV_ARGS(&dxgiBackBuffer));
+        if (FAILED(hr)) return false;
+
+        D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(
+            D2D1_RENDER_TARGET_TYPE_DEFAULT,
+            D2D1::PixelFormat(DXGI_FORMAT_UNKNOWN, D2D1_ALPHA_MODE_PREMULTIPLIED)
+        );
+
+        hr = d2dFactory->CreateDxgiSurfaceRenderTarget(dxgiBackBuffer, &props, &d2dRenderTarget);
+        dxgiBackBuffer->Release();
+        return SUCCEEDED(hr);
+    }
+
+    void cleanup_render_target() {
+        if (d2dRenderTarget) { d2dRenderTarget->Release(); d2dRenderTarget = nullptr; }
     }
 
     void begin_frame() {
