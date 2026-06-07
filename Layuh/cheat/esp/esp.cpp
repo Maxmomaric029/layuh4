@@ -381,6 +381,7 @@ bool CESP::draw_radar(matrix view_matrix)
             player_dot_color
         );
 
+        float glow_pulse = sinf(time * 3.0f + dist_to_player * 0.05f) * 0.7f;
         ImColor glow_dot_color = player_dot_color;
         glow_dot_color.Value.w = 0.5f * pulse_strength;
 
