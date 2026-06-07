@@ -51,27 +51,27 @@ bool CMenu::draw_menu() {
             ui::toggle("Draw FOV", vars::aimbot::fov_circle);
             ui::toggle("Target Line", vars::aimbot::target_line);
             ui::slider_float("FOV Size", vars::aimbot::fov_value, 10.0f, 500.0f);
-            ui::slider_float("Smoothness", vars::aimbot::smoothness, 1.0f, 10.0f);
+            ui::slider_float("Smoothness", vars::aimbot::aimbot_smoothing, 1.0f, 10.0f);
             ui::end_group_box();
         } 
         else if (active_tab == 1) {
             ui::begin_group_box("ESP Settings", 420, 360);
-            ui::toggle("Master Switch", vars::esp::box);
+            ui::toggle("Master Switch", vars::esp::esp_box);
             ui::same_line(); ui::toggle("Filled Box", vars::esp::esp_fill_box);
-            ui::toggle("Show Name", vars::esp::name);
+            ui::toggle("Show Name", vars::esp::esp_name);
             ui::same_line(); ui::toggle("Show Health", vars::esp::esp_health_bar);
-            ui::toggle("Show Distance", vars::esp::distance);
+            ui::toggle("Show Distance", vars::esp::esp_distance);
             ui::toggle("Show Skeleton", vars::esp::esp_skeleton);
-            ui::slider_float("Render Distance", vars::esp::max_distance, 0.0f, 10000.0f);
+            ui::slider_float("Render Distance", vars::esp::esp_max_distance, 0.0f, 10000.0f);
             ui::end_group_box();
         }
         else if (active_tab == 2) {
             ui::begin_group_box("Miscellaneous", 420, 360);
             ui::toggle("Fly Hack", vars::misc::fly_enabled);
-            ui::slider_int("Fly Speed", vars::misc::fly_speed, 1, 250);
+            ui::slider_float("Fly Speed", vars::misc::fly_speed, 1.0f, 250.0f);
             ui::toggle("Speed Hack", vars::misc::speed_hack_enabled);
-            ui::slider_int("Walk Speed", vars::misc::speed_value, 16, 300);
-            ui::toggle("Infinite Jump", vars::misc::infinite_jump_enabled);
+            ui::slider_float("Walk Speed", vars::misc::speed_multiplier, 1.0f, 10.0f);
+            ui::toggle("Instant Prompt", vars::misc::instant_prompt_enabled);
             ui::end_group_box();
         }
 
