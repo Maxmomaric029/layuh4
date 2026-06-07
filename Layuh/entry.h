@@ -18,9 +18,9 @@
 #include < iomanip >
 #include < iostream >
 #include < cmath >
-#include "d3dx9.h"
+#include < d3d11.h >
 #include <d3d9.h>
-#include "d3dx9tex.h"
+#include < d3dcompiler.h >
 #include "kernel/driver.h"
 
 #include "cheat/utils/utils.h"
@@ -269,7 +269,7 @@ namespace vars
     namespace stream_sniper
     {
         inline bool enabled = false;
- 
+  
     }
 
     namespace whitelist
