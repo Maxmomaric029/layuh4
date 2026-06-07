@@ -657,7 +657,7 @@ bool CESP::draw_players(matrix view_matrix)
         }
         else if (vars::esp::esp_mode == 0)
         {
-            auto head_result = get_part_position(character, "Head");
+            auto head_result = get_part_position(player_instance, character, "Head");
             if (!head_result.second)
                 continue;
             head_pos = head_result.first + Vector(0, 1.0f, 0);
@@ -819,7 +819,7 @@ bool CESP::draw_players(matrix view_matrix)
         bool head_valid = false;
         if (vars::esp::esp_mode == 1)
         {
-            auto head_result = get_part_position(teleport_character, "Head");
+            auto head_result = get_part_position(globals::teleport_target, teleport_character, "Head");
             if (!head_result.second)
                 return true;
             head_pos = head_result.first;
@@ -827,7 +827,7 @@ bool CESP::draw_players(matrix view_matrix)
         }
         else
         {
-            auto head_result = get_part_position(teleport_character, "Head");
+            auto head_result = get_part_position(globals::teleport_target, teleport_character, "Head");
             if (!head_result.second)
                 return true;
             head_pos = head_result.first + Vector(0, 1.0f, 0);
