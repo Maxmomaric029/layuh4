@@ -26,7 +26,7 @@ jobs:
       run: |
         cd /d "Layuh\cheat\include\zlib"
         cmake -B build -G "Visual Studio 17 2022" -A x64
-        cmake --build build --config Release
+        cmake --build build --config Release --target zlibstatic
         if not exist "..\..\..\cheat\include\libs" mkdir "..\..\..\cheat\include\libs"
         copy /Y "build\Release\zlibstatic.lib" "..\..\..\cheat\include\libs\zlib.lib"
 
