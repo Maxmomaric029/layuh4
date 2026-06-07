@@ -161,8 +161,8 @@ void overlay::render()
             fs::misc.spinbot();
             fs::misc.speed_hack();
             fs::misc.jump_power();
-            fs::misc.custom_fov();
-            fs::misc.gravity_modifier();
+            // fs::misc.custom_fov(); // Not implemented in misc.cpp
+            // fs::misc.gravity_modifier(); // Not implemented in misc.cpp
             fs::misc.rapid_fire();
             fs::misc.headless();
             fs::misc.NoJumpCoolDown();

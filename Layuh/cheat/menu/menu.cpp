@@ -32,21 +32,21 @@ bool CMenu::draw_menu() {
         return true;
     }
 
-    ui::set_next_window_size(650, 450);
+    ui::set_next_window_size(800, 600);
     if (ui::begin_window("DeadLock Premium", menu_x, menu_y)) {
         
         // Sidebar tabs
-        ui::begin_group_box("Navigation", 150, 360);
-        if (ui::tab("Aimbot", active_tab == 0, 120, 35)) active_tab = 0;
-        if (ui::tab("Visuals", active_tab == 1, 120, 35)) active_tab = 1;
-        if (ui::tab("Misc", active_tab == 2, 120, 35)) active_tab = 2;
+        ui::begin_group_box("Navigation", 200, 510);
+        if (ui::tab("Aimbot", active_tab == 0, 160, 45)) active_tab = 0;
+        if (ui::tab("Visuals", active_tab == 1, 160, 45)) active_tab = 1;
+        if (ui::tab("Misc", active_tab == 2, 160, 45)) active_tab = 2;
         ui::end_group_box();
 
         // Main content area
-        ui::set_cursor(menu_x + 190, menu_y + 65); // Move to right of sidebar
+        ui::set_cursor(menu_x + 230, menu_y + 70); // Move to right of sidebar
 
         if (active_tab == 0) {
-            ui::begin_group_box("Aimbot Settings", 420, 360);
+            ui::begin_group_box("Aimbot Settings", 540, 510);
             ui::toggle("Enable Aimbot", vars::aimbot::aimbot_enabled);
             ui::toggle("Draw FOV", vars::aimbot::fov_circle);
             ui::toggle("Target Line", vars::aimbot::target_line);
@@ -55,7 +55,8 @@ bool CMenu::draw_menu() {
             ui::end_group_box();
         } 
         else if (active_tab == 1) {
-            ui::begin_group_box("ESP Settings", 420, 360);
+            ui::set_cursor(menu_x + 230, menu_y + 70);
+            ui::begin_group_box("ESP Settings", 540, 510);
             ui::toggle("Master Switch", vars::esp::esp_box);
             ui::same_line(); ui::toggle("Filled Box", vars::esp::esp_fill_box);
             ui::toggle("Show Name", vars::esp::esp_name);
@@ -66,7 +67,8 @@ bool CMenu::draw_menu() {
             ui::end_group_box();
         }
         else if (active_tab == 2) {
-            ui::begin_group_box("Miscellaneous", 420, 360);
+            ui::set_cursor(menu_x + 230, menu_y + 70);
+            ui::begin_group_box("Miscellaneous", 540, 510);
             ui::toggle("Fly Hack", vars::misc::fly_enabled);
             ui::slider_float("Fly Speed", vars::misc::fly_speed, 1.0f, 250.0f);
             ui::toggle("Speed Hack", vars::misc::speed_hack_enabled);
