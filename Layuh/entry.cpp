@@ -9,6 +9,29 @@
 
 void sessionStatus();
 
+std::string readstring(std::uint64_t address)
+{
+    std::string string;
+    char character = 0;
+    int char_size = sizeof(character);
+    int offset = 0;
+
+    string.reserve(204);
+
+    while (offset < 200)
+    {
+        character = read<char>(address + offset);
+
+        if (character == 0)
+            break;
+
+        offset += char_size;
+        string.push_back(character);
+    }
+
+    return string;
+}
+
 void sessionStatus() {
     std::string password;
     std::cout << "Enter password: ";
