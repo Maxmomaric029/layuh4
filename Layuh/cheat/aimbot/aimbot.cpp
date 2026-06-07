@@ -592,6 +592,12 @@ bool CAimbot::aim_at_closest_player(matrix view_matrix)
         }
     }
 
+    if (vars::aimbot::fov_circle)
+    {
+        ImVec2 center(GetSystemMetrics(SM_CXSCREEN) / 2.0f, GetSystemMetrics(SM_CYSCREEN) / 2.0f);
+        drawingapi::drawing.circle(center, vars::aimbot::fov_value, ImColor(255, 255, 255, 255), 1.0f);
+    }
+
     if (!globals::key_info::aimbot_active)
     {
         locked_target = 0;

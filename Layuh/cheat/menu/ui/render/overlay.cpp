@@ -133,7 +133,12 @@ void overlay::render()
 
         ui::update_input(hwnd);
 
-        HWND roblox_window = FindWindowA(NULL, oxorany("Roblox"));
+        static HWND roblox_window = NULL;
+        static int frame_counter = 0;
+        if (!roblox_window || ++frame_counter > 60) {
+            roblox_window = FindWindowA(NULL, oxorany("Roblox"));
+            frame_counter = 0;
+        }
         bool roblox_focused = (GetForegroundWindow() == roblox_window);
 
         g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, NULL);

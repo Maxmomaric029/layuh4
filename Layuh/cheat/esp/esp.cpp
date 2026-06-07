@@ -1,10 +1,18 @@
 #include "esp.h"
 #include < functional >
 
+#include < unordered_map >
+#include < string >
+
 ImVec2 screen_center(GetSystemMetrics(SM_CXSCREEN) / 2, GetSystemMetrics(SM_CYSCREEN) / 2);
 
+struct PlayerCache {
+    uintptr_t character = 0;
+    std::unordered_map<std::string, uintptr_t> primitives;
+};
+static std::unordered_map<uintptr_t, PlayerCache> g_player_cache;
 
-void draw_skeleton(uintptr_t character, const matrix& view_matrix, int rig_type, ImColor color)
+void draw_skeleton(uintptr_t player_instance, uintptr_t character, const matrix& view_matrix, int rig_type, ImColor color)
 {
     struct bone_part
     {
@@ -14,22 +22,29 @@ void draw_skeleton(uintptr_t character, const matrix& view_matrix, int rig_type,
         bool valid = false;
     };
 
-    auto get_part_position = [&](uintptr_t character, const char* name) -> std::pair<Vector, bool>
+    auto get_part_position = [&](uintptr_t player_instance, uintptr_t character, const char* name) -> std::pair<Vector, bool>
         {
-            if (character == 0)
-            {
-                return { Vector(), false };
+            if (character == 0) return { Vector(), false };
+
+            auto& cache = g_player_cache[player_instance];
+            if (cache.character != character) {
+                cache.character = character;
+                cache.primitives.clear();
             }
-            auto part = utils::find_first_child(character, name);
-            if (!part)
-            {
-                return { Vector(), false };
+
+            uintptr_t primitive = 0;
+            auto it = cache.primitives.find(name);
+            if (it != cache.primitives.end()) {
+                primitive = it->second;
+            } else {
+                auto part = utils::find_first_child(character, name);
+                if (part) {
+                    primitive = read<uintptr_t>(part + offsets::Primitive);
+                    if (primitive) cache.primitives[name] = primitive;
+                }
             }
-            auto primitive = read<uintptr_t>(part + offsets::Primitive);
-            if (!primitive)
-            {
-                return { Vector(), false };
-            }
+
+            if (!primitive) return { Vector(), false };
             Vector pos = read<Vector>(primitive + offsets::Position);
             return { pos, true };
         };
@@ -69,7 +84,7 @@ void draw_skeleton(uintptr_t character, const matrix& view_matrix, int rig_type,
 
     for (auto& bone : bones)
     {
-        auto [pos, valid] = get_part_position(character, bone.name);
+        auto [pos, valid] = get_part_position(player_instance, character, bone.name);
         if (valid)
         {
             bone.position = pos;
@@ -520,16 +535,29 @@ bool CESP::draw_players(matrix view_matrix)
             player_instances = new_player_instances;
         }
     }
-    auto get_part_position = [](uintptr_t character, const char* name) -> std::pair<Vector, bool>
+    auto get_part_position = [](uintptr_t player_instance, uintptr_t character, const char* name) -> std::pair<Vector, bool>
         {
-            if (character == 0)
-                return { Vector(), false };
-            auto part = utils::find_first_child(character, name);
-            if (!part)
-                return { Vector(), false };
-            auto primitive = read<uintptr_t>(part + offsets::Primitive);
-            if (!primitive)
-                return { Vector(), false };
+            if (character == 0) return { Vector(), false };
+
+            auto& cache = g_player_cache[player_instance];
+            if (cache.character != character) {
+                cache.character = character;
+                cache.primitives.clear();
+            }
+
+            uintptr_t primitive = 0;
+            auto it = cache.primitives.find(name);
+            if (it != cache.primitives.end()) {
+                primitive = it->second;
+            } else {
+                auto part = utils::find_first_child(character, name);
+                if (part) {
+                    primitive = read<uintptr_t>(part + offsets::Primitive);
+                    if (primitive) cache.primitives[name] = primitive;
+                }
+            }
+
+            if (!primitive) return { Vector(), false };
             Vector pos = read<Vector>(primitive + offsets::Position);
             return { pos, true };
         };
@@ -584,27 +612,27 @@ bool CESP::draw_players(matrix view_matrix)
             continue;
         if (vars::esp::esp_skeleton)
         {
-            draw_skeleton(character, view_matrix, rig_type, skeleton_color);
+            draw_skeleton(player_instance, character, view_matrix, rig_type, skeleton_color);
         }
         Vector head_pos, mid_pos, bot_pos;
         Vector2D head_screen, mid_screen, bot_screen;
         bool head_valid = false, mid_valid = false, bot_valid = false;
         if (vars::esp::esp_mode == 1)
         {
-            auto head_result = get_part_position(character, "Head");
+            auto head_result = get_part_position(player_instance, character, "Head");
             if (!head_result.second)
                 continue;
             head_pos = head_result.first;
             head_valid = utils::world_to_screen(head_pos, head_screen, view_matrix, screen_size.x, screen_size.y);
             if (rig_type == 1)
             {
-                auto mid_result = get_part_position(character, "LowerTorso");
+                auto mid_result = get_part_position(player_instance, character, "LowerTorso");
                 if (mid_result.second)
                 {
                     mid_pos = mid_result.first;
                     mid_valid = utils::world_to_screen(mid_pos, mid_screen, view_matrix, screen_size.x, screen_size.y);
                 }
-                auto bot_result = get_part_position(character, "LeftFoot");
+                auto bot_result = get_part_position(player_instance, character, "LeftFoot");
                 if (bot_result.second)
                 {
                     bot_pos = bot_result.first;
@@ -613,13 +641,13 @@ bool CESP::draw_players(matrix view_matrix)
             }
             else
             {
-                auto mid_result = get_part_position(character, "Torso");
+                auto mid_result = get_part_position(player_instance, character, "Torso");
                 if (mid_result.second)
                 {
                     mid_pos = mid_result.first;
                     mid_valid = utils::world_to_screen(mid_pos, mid_screen, view_matrix, screen_size.x, screen_size.y);
                 }
-                auto bot_result = get_part_position(character, "Left Leg");
+                auto bot_result = get_part_position(player_instance, character, "Left Leg");
                 if (bot_result.second)
                 {
                     bot_pos = bot_result.first;
