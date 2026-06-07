@@ -3,9 +3,9 @@
 #include "cheat/globals/roblox.h"
 #include <wininet.h>
 #pragma comment(lib, "wininet.lib")
-#include "utils.hpp"
+#include "keyauth/utils.hpp"
 #include <iostream>
-#include "auth.hpp"
+#include "keyauth/auth.hpp"
 
 void sessionStatus();
 
