@@ -242,9 +242,8 @@ void cleanup_render_target()
 LRESULT WINAPI wnd_proc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     if (ui::menu_open) {
-        // Return 1 if we consumed a mouse message, so it doesn't propagate
-        if (msg == WM_LBUTTONDOWN || msg == WM_LBUTTONUP || msg == WM_MOUSEMOVE) {
-            // we could return 1 here if we wanted to block game input
+        if (msg == WM_LBUTTONDOWN || msg == WM_LBUTTONUP || msg == WM_RBUTTONDOWN || msg == WM_RBUTTONUP || msg == WM_MOUSEMOVE) {
+            return 1; // Block game input when menu is open
         }
     }
 

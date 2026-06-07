@@ -1,0 +1,203 @@
+I've completed a thorough review of all four files. Here are all the bugs, logic errors, and issues I found:
+
+---
+
+## esp.cpp
+
+### BUG 1 (CRITICAL) — Flawed health check always skips dead players AND zero-health reads
+**File:** `esp.cpp`, **Line 608**
+```cpp
+if (health && health <= 0.0f)
+    continue;
+```
+**Problem:** `health && health <= 0.0f` is logically broken. `health` (a float) is truthy for any non-zero value. So this condition is: "if health is non-zero AND health <= 0", which means it only triggers when health is *exactly* a negative number. If health is exactly `0.0f`, the float is falsy, so the first operand `health` is false and the whole condition is false — **dead players with health=0 are NOT skipped**. If health is a valid positive value, `health <= 0.0f` is false so it's fine. But the intent was clearly to skip dead players.
+**Fix:** `if (health <= 0.0f) continue;` — same pattern used in `draw_radar` at line 429.
+
+### BUG 2 (CRITICAL) — Rig type check always evaluates false
+**File:** `esp.cpp`, **Line 611**
+```cpp
+if (!rig_type && rig_type == -1)
+    continue;
+```
+**Problem:** This condition can **never** be true. `!rig_type` is true only when `rig_type == 0`. `rig_type == -1` is true only when it's `-1`. Both cannot be true simultaneously. This means R6 rigs (`rig_type == 0`) and invalid rigs (`rig_type == -1`) are both NOT filtered out. Players with unrecognized rigs will proceed and potentially cause issues downstream.
+**Fix:** `if (rig_type == -1) continue;` — to only skip unrecognized rigs. Or `if (rig_type < 0) continue;`.
+
+### BUG 3 (MEDIUM) — OOF arrows drawn even when player is on-screen
+**File:** `esp.cpp`, **Lines 707-710**
+```cpp
+if (vars::esp::esp_oof_arrows)
+{
+    DrawArrow(screen_center, head_screen, vars::aimbot::fov_value + 20.0f, oof_arrow_color, false);
+}
+```
+**Problem:** OOF (out-of-field) arrows are supposed to indicate off-screen players, but this code draws them for every player regardless of whether they are on-screen or not. There's no check like `if (!head_valid || !is_on_screen)`. Since execution reaches here only when `head_valid` is true, arrows are always drawn on top of on-screen players.
+**Fix:** Add a condition to only draw the arrow when the player is off-screen or outside the FOV circle.
+
+### BUG 4 (LOW) — `rotate_point` function declared/defined but never called
+**File:** `esp.cpp`, **Lines 242-277**
+**Problem:** The `rotate_point` function is defined but never used anywhere in the codebase. Dead code.
+
+### BUG 5 (LOW) — `glow_pulse` variable computed but never used
+**File:** `esp.cpp`, **Line 454**
+```cpp
+float glow_pulse = sinf(time * 3.0f + dist_to_player * 0.05f) * 0.7f;
+```
+**Problem:** `glow_pulse` is calculated but never referenced. `pulse_strength` is used instead on line 456. This is dead/wasted computation.
+
+### BUG 6 (LOW) — Static player_instances cache is stale across games
+**File:** `esp.cpp`, **Lines 398-404 and 525-536**
+```cpp
+static std::vector<uintptr_t> player_instances;
+```
+**Problem:** The player instance list and the `g_player_cache` are `static` / global and never cleared between game sessions. If the user leaves one game and joins another, stale pointers from the previous session remain in the cache until the timer elapses. This could cause reading from invalid memory addresses.
+
+### BUG 7 (LOW) — `screen_center` global variable at file scope calls Win32 API at static init time
+**File:** `esp.cpp`, **Line 7**
+```cpp
+ImVec2 screen_center(GetSystemMetrics(SM_CXSCREEN) / 2, GetSystemMetrics(SM_CYSCREEN) / 2);
+```
+**Problem:** This is computed once at static initialization before `main()`. If the display resolution changes or if DPI-awareness isn't set yet, this will have the wrong value for the lifetime of the process. It's also shadowed by a local `screen_center` inside `draw_players` (line 575), making this global unused there.
+
+---
+
+## aimbot.cpp
+
+### BUG 8 (CRITICAL) — Null pointer dereference: `workspace` not checked before use
+**File:** `aimbot.cpp`, **Lines 1016-1017**
+```cpp
+auto workspace = utils::find_first_child_byclass(globals::datamodel, "Workspace");
+auto camera = read<uintptr_t>(workspace + offsets::Camera);
+```
+**Problem:** `workspace` is used directly on line 1017 without a null check. If `find_first_child_byclass` returns 0/null, this reads from offset `0 + offsets::Camera`, which is almost certainly an invalid address. Compare with lines 698-701 where the same pattern *does* check `if (workspace)`.
+**Fix:** Add `if (!workspace) return false;` or `if (!workspace) break;` before using it.
+
+### BUG 9 (CRITICAL) — `humanoid_root_part` used without null check before dereferencing
+**File:** `aimbot.cpp`, **Lines 966-968**
+```cpp
+auto humanoid_root_part = utils::find_first_child(character, "HumanoidRootPart");
+auto h_r_p_primtive = read<uintptr_t>(humanoid_root_part + offsets::Primitive);
+if (humanoid_root_part && h_r_p_primtive)
+```
+**Problem:** `humanoid_root_part` is read on line 967 (`read<uintptr_t>(humanoid_root_part + offsets::Primitive)`) BEFORE it's null-checked on line 968. If `find_first_child` returns null, this reads from an invalid address.
+**Fix:** Move the null check before the read:
+```cpp
+auto humanoid_root_part = utils::find_first_child(character, "HumanoidRootPart");
+if (!humanoid_root_part) { /* skip prediction */ }
+auto h_r_p_primtive = read<uintptr_t>(humanoid_root_part + offsets::Primitive);
+```
+
+### BUG 10 (MEDIUM) — `mouse_event` used with float-to-DWORD truncation for movement
+**File:** `aimbot.cpp`, **Line 1009**
+```cpp
+mouse_event(MOUSEEVENTF_MOVE, static_cast<DWORD>(move_x), static_cast<DWORD>(move_y), 0, 0);
+```
+**Problem:** `DWORD` is `unsigned long`. Casting negative floats (moving left or up) to an unsigned type produces incorrect huge values, not negative movement. `mouse_event` expects the `dx`/`dy` parameters as `DWORD` but they're actually treated as signed internally. However, the cast to unsigned from a negative float is undefined behavior in C++. The `SendInput` path on line 1042-1043 correctly uses `static_cast<LONG>` (signed).
+**Fix:** Cast to `LONG` (or `int`) first: `mouse_event(MOUSEEVENTF_MOVE, static_cast<DWORD>(static_cast<LONG>(move_x)), ...)` or switch to `SendInput`.
+
+### BUG 11 (MEDIUM) — `got_aim_instances` flag is set but serves no purpose
+**File:** `aimbot.cpp`, **Lines 543-549**
+```cpp
+bool got_aim_instances = false;
+AimInstances GetInstances(uintptr_t player) {
+    if (!got_aim_instances)
+        got_aim_instances = true;
+    AimInstances aims = GetAimInstances(player);
+    return aims;
+}
+```
+**Problem:** The `got_aim_instances` flag is set to `true` on the first call but never checked for any conditional behavior. The function unconditionally calls `GetAimInstances` every time regardless. This wrapper function appears to have been intended as a caching mechanism but was never completed. Additionally, `GetInstances` itself appears to never be called — only `GetAimInstances` is called directly on line 1051.
+
+### BUG 12 (MEDIUM) — `GetCachedMouseService` never actually caches
+**File:** `aimbot.cpp`, **Lines 37-41**
+```cpp
+uintptr_t GetCachedMouseService() {
+    static uintptr_t cached_mouse_service = 0;
+    cached_mouse_service = FindMouseService(globals::datamodel);
+    return cached_mouse_service;
+}
+```
+**Problem:** Despite the name `GetCachedMouseService` and having a `static` variable, this function overwrites the cached value unconditionally every call. There's no caching logic. It's equivalent to just calling `FindMouseService` directly.
+**Fix:** Add actual caching: only re-find if `cached_mouse_service` is 0, or use a timer.
+
+### BUG 13 (MEDIUM) — Dead code: `last_target` in `sex_target()` is always 0 in the else branch
+**File:** `aimbot.cpp`, **Lines 534-537**
+```cpp
+if (this->locked_target)  // We are in the `else` block where this->locked_target is 0
+{
+    last_target = this->locked_target;
+}
+```
+**Problem:** This code is inside the `else` branch of `if (this->locked_target)` (line 209). Since we're in the else, `this->locked_target` is guaranteed to be 0 (falsy). So the inner `if (this->locked_target)` on line 534 will NEVER be true. `last_target` will never be set to a new value in this path; it only gets cleared to 0 on line 531. This means the collision-restore logic on lines 497-528 will only ever work for the first unlock — after that `last_target` is always 0.
+
+### BUG 14 (MEDIUM) — `ClipMouse(true)` called on every frame without cleanup
+**File:** `aimbot.cpp`, **Line 1046**
+```cpp
+ClipMouse(true);
+```
+**Problem:** When aimbot_method==2, `ClipMouse(true)` is called every frame while aiming, but `ClipMouse(false)` is never called when aimbot disengages. The cursor remains clipped to the Roblox window even after the aimbot key is released.
+**Fix:** Call `ClipMouse(false)` when the aimbot deactivates (e.g., in the `!globals::key_info::aimbot_active` early-return block).
+
+### BUG 15 (MEDIUM) — Triggerbot break statement prematurely exits per-bone search
+**File:** `aimbot.cpp`, **Line 1230**
+```cpp
+break;
+```
+**Problem:** In the triggerbot's random bone scan (aimbot_method == 2), the code shuffles bone indices and iterates, but unconditionally `break`s after the first valid bone that passes the `!target_bone` and `!primitive` checks — regardless of whether it matched the cursor. This means only one bone is ever tested per player per frame, defeating the purpose of shuffling all bones. If that one bone isn't under the cursor, the player is skipped entirely.
+**Fix:** Remove the `break;` statement so all bones can be checked, or only break when a match is found.
+
+### BUG 16 (LOW) — Inconsistent health check in triggerbot
+**File:** `aimbot.cpp`, **Line 1188**
+```cpp
+if ((vars::aimbot::knock_check && health < vars::aimbot::minimum_knock_hp) || (health && health <= 0))
+```
+**Problem:** Same pattern as ESP Bug 1 — `(health && health <= 0)` only matches negative health, not exactly `0.0f`. If a player has exactly 0 health, this check doesn't filter them.
+**Fix:** `(health <= 0.0f)` without the boolean check on `health`.
+
+### BUG 17 (LOW) — `toggle_key_down` in `aim_at_closest_player` has dual conflicting usage
+**File:** `aimbot.cpp`, **Lines 555 and 760**
+The static `toggle_key_down` is used for both the main toggle logic (lines 570-583) AND the target-switching logic (line 760). After the toggle on line 573 sets `toggle_key_down = true`, line 760's check `key_pressed && !toggle_key_down` will never be true on the same frame. This means target switching on a second press in toggle mode only works on a *separate* press, which may actually be the intended behavior, but the variable reuse is fragile.
+
+### BUG 18 (LOW) — `LookAtToMatrix` sign conventions look inconsistent
+**File:** `aimbot.cpp`, **Lines 22-24**
+```cpp
+lookAtMatrix.data[0] = -right.x;  lookAtMatrix.data[1] = up.x;  lookAtMatrix.data[2] = -forward.x;
+lookAtMatrix.data[3] = right.y;   lookAtMatrix.data[4] = up.y;  lookAtMatrix.data[5] = -forward.y;
+lookAtMatrix.data[6] = -right.z;  lookAtMatrix.data[7] = up.z;  lookAtMatrix.data[8] = -forward.z;
+```
+**Problem:** The `right` vector has inconsistent sign negation: `data[0] = -right.x` and `data[6] = -right.z` are negated, but `data[3] = right.y` is NOT negated. This creates a non-orthogonal rotation matrix that can cause visual glitches or incorrect aim orientation when there's any vertical component to the right vector. For a proper rotation matrix, the negation should be consistent across all components of each basis vector.
+
+### BUG 19 (LOW) — `part_primitive` not null-checked before write in `sex_target`
+**File:** `aimbot.cpp`, **Lines 263-264 and 524-525**
+```cpp
+uint64_t part_primitive = read<uintptr_t>(child_instance + offsets::Primitive);
+write<bool>(part_primitive + offsets::CanCollide, true);
+```
+**Problem:** `part_primitive` is read but never null-checked before being written to. If the read returns 0, this writes to a near-null address.
+**Fix:** Add `if (part_primitive)` before the write.
+
+---
+
+## esp.h / aimbot.h
+
+### ISSUE 20 (LOW) — `draw_instances` is commented out
+**File:** `esp.h`, **Line 8**
+```cpp
+//bool draw_instances(matrix viewmatrix);
+```
+Dead/unfinished feature. Not a bug per se, but should be cleaned up or implemented.
+
+### ISSUE 21 (LOW) — `locked_target` member is private but accessed via `this->` in methods that also interact with static local state
+**File:** `aimbot.h`, **Line 12**
+`locked_target` is an instance member of `CAimbot`, but `fs::aimbot` is a global inline instance. All the static local variables in the methods (like `last_target_pos`, `saved_original`, etc.) implicitly assume there's only one instance. If a second instance were ever created, the static locals would be shared but `locked_target` wouldn't, causing state corruption. Not a practical bug with current usage, but a design smell.
+
+---
+
+## Summary of Critical Bugs (will cause incorrect behavior):
+
+| # | File | Line | Issue |
+|---|------|------|-------|
+| 1 | esp.cpp | 608 | `health && health <= 0` never catches health==0; dead players shown |
+| 2 | esp.cpp | 611 | `!rig_type && rig_type == -1` is always false; invalid rigs not filtered |
+| 8 | aimbot.cpp | 1016-1017 | Null deref: `workspace` used without null check |
+| 9 | aimbot.cpp | 966-968 | Null deref: `humanoid_root_part` read before null check |
+| 10 | aimbot.cpp | 1009 | Negative float cast to DWORD (unsigned) — undefined behavior |

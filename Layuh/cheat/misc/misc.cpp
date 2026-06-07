@@ -73,56 +73,6 @@ uintptr_t GetCharacter(uintptr_t self)
     return read<uintptr_t>(self + offsets::ModelInstance);
 }
 
-class Vector3 {
-public:
-    float x, y, z;
-
-    Vector3() : x(0), y(0), z(0) {}
-    Vector3(float x_, float y_, float z_) : x(x_), y(y_), z(z_) {}
-
-    Vector3 operator+(const Vector3& other) const {
-        return Vector3(x + other.x, y + other.y, z + other.z);
-    }
-
-    Vector3 operator-(const Vector3& other) const {
-        return Vector3(x - other.x, y - other.y, z - other.z);
-    }
-
-    Vector3 operator*(float scalar) const {
-        return Vector3(x * scalar, y * scalar, z * scalar);
-    }
-
-    Vector3 operator/(float scalar) const {
-        return Vector3(x / scalar, y / scalar, z / scalar);
-    }
-
-    float dot(const Vector3& other) const {
-        return x * other.x + y * other.y + z * other.z;
-    }
-
-    Vector3 cross(const Vector3& other) const {
-        return Vector3(
-            y * other.z - z * other.y,
-            z * other.x - x * other.z,
-            x * other.y - y * other.x
-        );
-    }
-
-    float length() const {
-        return std::sqrt(x * x + y * y + z * z);
-    }
-
-    Vector3 normalized() const {
-        float len = length();
-        return (len == 0) ? Vector3() : (*this) / len;
-    }
-
-    friend std::ostream& operator<<(std::ostream& os, const Vector3& v) {
-        os << "(" << v.x << ", " << v.y << ", " << v.z << ")";
-        return os;
-    }
-};
-
 void CMisc::teleport_to_nearest(matrix viewmatrix)
 {
     if (!vars::misc::teleport_to_nearest)
@@ -334,7 +284,6 @@ void CMisc::spinbot()
         Vector newvec(oldvel.x + distr(gen), oldvel.y + distr(gen), oldvel.z + distr(gen));
 
         write<Vector>(primitive + offsets::Position, newvec);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
         write<Vector>(primitive + offsets::Position, oldvel);
     }
 }
@@ -397,14 +346,6 @@ void CMisc::fly()
 
     if (vars::misc::fly_method == 0)
     {
-        Vector flatLook = lookVector;
-        if (flatLook.y != 0)
-        {
-            flatLook.y = 0;
-            if (!flatLook.IsZero())
-                flatLook.Normalize();
-        }
-
         if (GetAsyncKeyState('W') & 0x8000)
         {
             moveDirection = moveDirection + lookVector;
@@ -466,7 +407,7 @@ void CMisc::fly()
             moveDirection = moveDirection * vars::misc::fly_speed;
         }
 
-        write<Vector>(primitive + offsets::Velocity, moveDirection * vars::misc::fly_speed);
+        write<Vector>(primitive + offsets::Velocity, moveDirection);
         write<bool>(primitive + offsets::CanCollide, false);
     }
 }
@@ -475,6 +416,9 @@ void CMisc::speed_hack()
 {
     static bool speed_toggled = false;
     static bool was_enabled = false;
+
+    if (!globals::local_player)
+        return;
 
     uintptr_t character = utils::get_model_instance(globals::local_player);
     if (!character)
@@ -698,7 +642,8 @@ void CMisc::rapid_fire()
     static bool mouseDown = false;
     if (!vars::misc::rapid_fire) return;
 
-    uintptr_t players = utils::find_first_child_byclass(globals::datamodel, "Players");
+    if (!globals::local_player)
+        return;
     std::string local_name = utils::get_instance_name(globals::local_player);
     uintptr_t character = utils::get_model_instance(globals::local_player);
     if (!character)
@@ -707,8 +652,6 @@ void CMisc::rapid_fire()
     uintptr_t bodyeffects = utils::find_first_child(character, "BodyEffects");
     if (!bodyeffects)
         return;
-	//printf("BodyEffects: %p\n", bodyeffects);
-    if (!bodyeffects) return;
     uintptr_t gunfiring = FindFirstChild(bodyeffects, "GunFiring");
 	//printf("GunFiring: %p\n", gunfiring);
     if (!gunfiring) return;
@@ -739,6 +682,9 @@ void CMisc::antistomp_realud()
     if (!antistomptoggle)
         return;
 
+    if (!globals::local_player)
+        return;
+
     uintptr_t character = utils::get_model_instance(globals::local_player);
     if (!character)
         return;
@@ -755,6 +701,8 @@ void CMisc::antistomp_realud()
     if (is_knocked)
     {
         uintptr_t humanoid = utils::find_first_child_byclass(character, "Humanoid");
+        if (!humanoid)
+            return;
         uintptr_t parent = read<uintptr_t>(character + offsets::Parent);
         write<uintptr_t>(character + offsets::Parent, 0);
         write<float>(humanoid + offsets::Health, 0);
@@ -802,10 +750,15 @@ void CMisc::NoJumpCoolDown()
     if (!humanoid)
         return;
 
-    if (vars::misc::nojumpcooldown) {
-        write<bool>(humanoid + offsets::JumpPower, false);
+    // Note: This shares the JumpPower offset with jump_power().
+    // Only apply when jump_power is not actively managing the value.
+    static bool prev_enabled = false;
+    if (vars::misc::nojumpcooldown && !vars::misc::jump_power_enabled) {
+        write<float>(humanoid + offsets::JumpPower, 0.0f);
+        prev_enabled = true;
     }
-    else {
-        write<bool>(humanoid + offsets::JumpPower, true);
+    else if (prev_enabled) {
+        write<float>(humanoid + offsets::JumpPower, 50.0f); // Restore on disable
+        prev_enabled = false;
     }
 }

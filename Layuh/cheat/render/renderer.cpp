@@ -81,8 +81,9 @@ namespace render {
 
         // Convertir std::string a std::wstring
         int len = MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, NULL, 0);
-        std::wstring wtext(len, 0);
-        MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, &wtext[0], len);
+        if (len <= 1) return; // Only null terminator
+        std::wstring wtext(len - 1, 0);
+        MultiByteToWideChar(CP_UTF8, 0, text.c_str(), len - 1, &wtext[0], len - 1);
 
         IDWriteTextFormat* format = nullptr;
         dWriteFactory->CreateTextFormat(
@@ -104,7 +105,7 @@ namespace render {
                 // Si esta centrado, le damos un ancho fijo y dibujamos desde un offset
                 layoutRect = D2D1::RectF(x - 500.0f, y, x + 500.0f, y + 1000.0f);
             }
-            d2dRenderTarget->DrawText(wtext.c_str(), wtext.length() - 1, format, layoutRect, brush);
+            d2dRenderTarget->DrawText(wtext.c_str(), wtext.length(), format, layoutRect, brush);
             brush->Release();
         }
 
@@ -215,15 +216,16 @@ namespace render {
         if (!dWriteFactory || text.empty()) return D2D1::SizeF(0, 0);
 
         int len = MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, NULL, 0);
-        std::wstring wtext(len, 0);
-        MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, &wtext[0], len);
+        if (len <= 1) return D2D1::SizeF(0, 0);
+        std::wstring wtext(len - 1, 0);
+        MultiByteToWideChar(CP_UTF8, 0, text.c_str(), len - 1, &wtext[0], len - 1);
 
         IDWriteTextFormat* format = nullptr;
         dWriteFactory->CreateTextFormat(L"Segoe UI", NULL, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, size, L"en-us", &format);
         if (!format) return D2D1::SizeF(0, 0);
 
         IDWriteTextLayout* layout = nullptr;
-        dWriteFactory->CreateTextLayout(wtext.c_str(), wtext.length() - 1, format, 10000.0f, 10000.0f, &layout);
+        dWriteFactory->CreateTextLayout(wtext.c_str(), wtext.length(), format, 10000.0f, 10000.0f, &layout);
         
         D2D1_SIZE_F result = D2D1::SizeF(0, 0);
         if (layout) {

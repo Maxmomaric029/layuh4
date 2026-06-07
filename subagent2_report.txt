@@ -1,0 +1,320 @@
+I've completed a thorough review of all 8 files. Here is the comprehensive bug/issue report. There are many findings — I've organized them by file and severity.
+
+---
+
+## FILE 1: `misc.cpp` — **CRITICAL & HIGH SEVERITY BUGS**
+
+### BUG 1 (CRITICAL): `NoJumpCoolDown()` writes `bool` to a `float` offset (Lines 805-810)
+```cpp
+// Line 805-809
+if (vars::misc::nojumpcooldown) {
+    write<bool>(humanoid + offsets::JumpPower, false);  // BUG!
+}
+else {
+    write<bool>(humanoid + offsets::JumpPower, true);   // BUG!
+}
+```
+**Problem**: This writes a `bool` type to `offsets::JumpPower`, which is a **float** offset (used correctly in `jump_power()` on line 611 as `write<float>(humanoid + offsets::JumpPower, jumpPower)`). Writing a `bool` to a float field corrupts the float value. It should be using a dedicated `JumpCoolDown` offset, not `JumpPower`. Also, the logic is inverted — `nojumpcooldown = true` writes `false` — which sort of makes sense semantically ("no cooldown" = disable cooldown), but using `JumpPower` is wrong.
+**Fix**: Use the correct offset for jump cooldown (e.g., `offsets::UseJumpPower` or a dedicated cooldown offset), and write the correct type.
+
+### BUG 2 (CRITICAL): `NoJumpCoolDown()` conflicts with `jump_power()` — both write to same offset simultaneously (Lines 594-619 vs 792-811)
+**Problem**: Both functions are called every frame in the overlay loop (lines 168 and 173 of overlay.cpp). If both `vars::misc::jump_power_enabled` and `vars::misc::nojumpcooldown` are true, they fight over `humanoid + offsets::JumpPower` — `jump_power()` writes a float, `NoJumpCoolDown()` writes a bool. The bool write will overwrite the first byte(s) of the float.
+**Fix**: Ensure mutual exclusivity or use different offsets.
+
+### BUG 3 (HIGH): `speed_hack()` missing null check for `globals::local_player` (Line 474-565)
+```cpp
+void CMisc::speed_hack() {
+    static bool speed_toggled = false;
+    static bool was_enabled = false;
+    // NO CHECK for globals::local_player!
+    uintptr_t character = utils::get_model_instance(globals::local_player); // Line 479
+```
+**Problem**: Unlike every other function, `speed_hack()` doesn't check `if (!globals::local_player) return;` before using it. If `local_player` is 0/null, it passes 0 to `get_model_instance()`.
+**Fix**: Add `if (!globals::local_player) return;` at the top.
+
+### BUG 4 (HIGH): `fly()` method 1 double-multiplies fly_speed (Line 469)
+```cpp
+// Line 463-469
+if (!moveDirection.IsZero()) {
+    moveDirection.Normalize();
+    moveDirection = moveDirection * vars::misc::fly_speed; // Already multiplied by fly_speed
+}
+write<Vector>(primitive + offsets::Velocity, moveDirection * vars::misc::fly_speed); // Multiplied AGAIN!
+```
+**Problem**: `moveDirection` is already multiplied by `fly_speed` on line 466, then multiplied again on line 469. The actual velocity becomes `fly_speed²` instead of `fly_speed`.
+**Fix**: Line 469 should be `write<Vector>(primitive + offsets::Velocity, moveDirection);`
+
+### BUG 5 (HIGH): `spinbot()` mode 2 calls `std::this_thread::sleep_for()` on the render thread (Line 337)
+```cpp
+write<Vector>(primitive + offsets::Position, newvec);
+std::this_thread::sleep_for(std::chrono::milliseconds(1)); // Line 337 - blocks render!
+write<Vector>(primitive + offsets::Position, oldvel);
+```
+**Problem**: This is called from the main render loop every frame. A `sleep_for` call on the render thread causes frame stuttering/drops.
+**Fix**: Use a frame-based timer instead of sleeping.
+
+### BUG 6 (MEDIUM): `spinbot()` mode 2 reads Position into variable named `oldvel` (Lines 332-338)
+```cpp
+Vector oldvel = read<Vector>(primitive + offsets::Position); // Named "oldvel" but it's position
+Vector newvec(oldvel.x + distr(gen), oldvel.y + distr(gen), oldvel.z + distr(gen));
+write<Vector>(primitive + offsets::Position, newvec);
+```
+**Problem**: Misleading variable name; `oldvel` is actually old *position*. Not a logic bug per se, but confusing and suggests the developer may have confused velocity and position at some point.
+
+### BUG 7 (MEDIUM): `rapid_fire()` doesn't check `globals::local_player` (Line 696-734)
+```cpp
+void CMisc::rapid_fire() {
+    static bool mouseDown = false;
+    if (!vars::misc::rapid_fire) return;
+    uintptr_t players = utils::find_first_child_byclass(globals::datamodel, "Players"); // Line 701
+    std::string local_name = utils::get_instance_name(globals::local_player);           // Line 702
+```
+**Problem**: No null check for `globals::local_player` before using it. Also `players` on line 701 is fetched but **never used** — dead code.
+**Fix**: Add null check; remove unused `players` variable.
+
+### BUG 8 (MEDIUM): `rapid_fire()` has redundant null check for `bodyeffects` (Lines 708 and 711)
+```cpp
+uintptr_t bodyeffects = utils::find_first_child(character, "BodyEffects");
+if (!bodyeffects) return;      // Line 708-709
+if (!bodyeffects) return;      // Line 711 - DUPLICATE
+```
+**Fix**: Remove the duplicate check on line 711.
+
+### BUG 9 (MEDIUM): `antistomp_realud()` missing null check for `humanoid` (Line 757-760)
+```cpp
+uintptr_t humanoid = utils::find_first_child_byclass(character, "Humanoid");
+uintptr_t parent = read<uintptr_t>(character + offsets::Parent);
+write<uintptr_t>(character + offsets::Parent, 0);
+write<float>(humanoid + offsets::Health, 0); // Line 760 - humanoid could be NULL!
+```
+**Problem**: `humanoid` is never null-checked before dereferencing on line 760. If the character doesn't have a Humanoid, this writes to address 0 + offset.
+**Fix**: Add `if (!humanoid) return;` before line 758.
+
+### BUG 10 (MEDIUM): `antistomp_realud()` doesn't check `globals::local_player` (Line 736-761)
+**Problem**: No null check for `globals::local_player` before using it.
+**Fix**: Add check at the top.
+
+### BUG 11 (LOW): Local `Vector3` class defined in misc.cpp (Lines 76-124) is never used
+**Problem**: A complete `Vector3` class is defined inside `misc.cpp` but every function uses the `Vector` type from elsewhere. This is 48 lines of dead code.
+**Fix**: Remove the `Vector3` class.
+
+### BUG 12 (LOW): `fly()` method 0 computes `flatLook` but never uses it (Lines 400-406)
+```cpp
+Vector flatLook = lookVector;
+if (flatLook.y != 0) {
+    flatLook.y = 0;
+    if (!flatLook.IsZero()) flatLook.Normalize();
+}
+// flatLook is NEVER used after this
+```
+**Fix**: Either use `flatLook` for horizontal movement or remove it.
+
+---
+
+## FILE 2: `misc.h` — **MISSING IMPLEMENTATIONS**
+
+### BUG 13 (CRITICAL — LINKER ERROR): 7 functions declared but not implemented in misc.cpp
+The following are declared in `misc.h` but have **no implementation** in `misc.cpp`:
+
+| Line | Declaration | Status |
+|------|------------|--------|
+| 8 | `void fix_position()` | ❌ Not implemented |
+| 12 | `void infinite_jump()` | ❌ Not implemented |
+| 16 | `void custom_fov()` | ❌ Not implemented |
+| 18 | `void star_count()` | ❌ Not implemented |
+| 20 | `void gravity_modifier()` | ❌ Not implemented |
+| 21 | `void sky_customizer()` | ❌ Not implemented |
+| 22 | `void print_game_info()` | ❌ Not implemented |
+| 24 | `void press_left_click()` | ❌ Not implemented |
+
+**Problem**: These will cause **linker errors** if called anywhere, or represent missing functionality. Note that `custom_fov()` and `gravity_modifier()` are even commented out in `overlay.cpp` line 169-170 with `// Not implemented in misc.cpp`.
+**Fix**: Either implement these functions or remove their declarations.
+
+---
+
+## FILE 3: `overlay.cpp` — **RENDERING AND LOGIC ISSUES**
+
+### BUG 14 (MEDIUM): Overlay never calls several implemented misc functions that have menu toggles
+The overlay loop calls these misc functions (lines 163-174):
+- `teleport_to_nearest`, `noclip`, `fly`, `spinbot`, `speed_hack`, `jump_power`, `rapid_fire`, `headless`, `NoJumpCoolDown`, `antistomp_realud`
+
+But these are **never called** despite having `vars::` toggles:
+- `instant_proximity_prompt()` — commented out implementation in misc.cpp AND commented out call
+- `custom_fov()` — commented out in overlay.cpp line 169
+- `gravity_modifier()` — commented out in overlay.cpp line 170
+- `infinite_jump()` — not called
+- `star_count()` — not called
+- `sky_customizer()` — not called
+
+### BUG 15 (MEDIUM): `wnd_proc` mouse handling block does nothing (Lines 244-249)
+```cpp
+if (ui::menu_open) {
+    if (msg == WM_LBUTTONDOWN || msg == WM_LBUTTONUP || msg == WM_MOUSEMOVE) {
+        // we could return 1 here if we wanted to block game input
+    }
+}
+```
+**Problem**: This if-block is completely empty. It should either block input or be removed.
+
+---
+
+## FILE 4: `menu.cpp` — **DISCONNECTED VARIABLES**
+
+### BUG 16 (HIGH): Menu toggles `vars::misc::instant_prompt_enabled` but `instant_proximity_prompt()` is commented out
+Line 76 in menu.cpp: `ui::toggle("Instant Prompt", vars::misc::instant_prompt_enabled);`
+The implementation `instant_proximity_prompt()` is fully commented out in misc.cpp (lines 568-592), and its declaration is commented out in misc.h (line 15). This toggle does absolutely nothing.
+
+### BUG 17 (MEDIUM): Many vars:: variables have no menu toggle and are unreachable
+These `vars::` variables exist in `entry.h` but have no menu toggle in `menu.cpp`:
+- `vars::misc::noclip_enabled`, `noclip_mode`, `noclip_key`
+- `vars::misc::spinbot_enabled`, `spinbot_mode`
+- `vars::misc::jump_power_enabled`, `jump_power_value`
+- `vars::misc::teleport_to_nearest`, `teleport_key`
+- `vars::misc::rapid_fire`
+- `vars::misc::antistomp`
+- `vars::misc::headless`
+- `vars::misc::nojumpcooldown`
+- `vars::misc::custom_fov_enabled`, `custom_fov_value`
+- `vars::misc::gravity_modifier_enabled`
+- `vars::misc::sky_customizer_enabled`
+- `vars::misc::streamproof`
+- `vars::misc::roblox_focused_check`
+- Most aimbot vars (prediction, team_check, triggerbot, etc.)
+- Many ESP vars (skeleton, tracer, radar, etc.)
+
+These features exist in code but the user has no way to enable/configure them from the menu.
+
+### BUG 18 (LOW): `draw_keybinds()`, `draw_watermark()`, `draw_instance_tree()`, `draw_instance_explorer()` are empty stubs (Lines 15-18)
+These are defined but do nothing. They're never called from the main loop either.
+
+---
+
+## FILE 5: `renderer.cpp` — **RESOURCE LEAK**
+
+### BUG 19 (MEDIUM): `draw_text()` creates a new `IDWriteTextFormat` every single call (Lines 87-111)
+```cpp
+void draw_text(const std::string& text, float x, float y, float size, ...) {
+    IDWriteTextFormat* format = nullptr;
+    dWriteFactory->CreateTextFormat(..., size, ..., &format); // Allocates every call!
+    ...
+    format->Release();
+}
+```
+**Problem**: Every call to `draw_text()` creates and destroys a `IDWriteTextFormat` COM object. This is called many times per frame (ESP names, distances, health, etc.). This is extremely slow due to COM allocation overhead. The default `textFormat` created on line 26-34 of `initialize()` is **never used**.
+**Fix**: Cache text formats by size, or use the default `textFormat` when size is 16.0f.
+
+### BUG 20 (LOW): `get_text_size()` also creates a new `IDWriteTextFormat` every call (Lines 221-222)
+Same issue as above.
+
+### BUG 21 (LOW): wstring includes null terminator causing potential off-by-one (Lines 83-85, 217-219)
+```cpp
+int len = MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, NULL, 0); // Includes null terminator
+std::wstring wtext(len, 0); // Allocates len chars + internal null
+MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, &wtext[0], len); // Writes null into string
+```
+Then on line 107: `d2dRenderTarget->DrawText(wtext.c_str(), wtext.length() - 1, ...);`
+The `- 1` compensates for the embedded null, but the string contains a null character inside it which is messy. Better approach: use `-1` to exclude the null in the initial `MultiByteToWideChar` call, or use `len - 1` for the wstring size.
+
+---
+
+## FILE 6: `renderer.h` — No significant issues found
+Header matches implementation. All declarations have implementations.
+
+---
+
+## FILE 7: `entry.cpp` — **BUGS AND ISSUES**
+
+### BUG 22 (HIGH): `rescan_thread` is wrapped in a redundant infinite loop (Line 273)
+```cpp
+std::thread([]() { for (;;) { rescan_thread(); } }).detach();
+```
+But `rescan_thread()` itself (lines 144-206) already contains `while (true)` — it never returns! The outer `for (;;)` is dead code, but if `rescan_thread()` ever does return unexpectedly, it would restart, which might be intentional. However, this is confusing and suggests a misunderstanding.
+
+### BUG 23 (HIGH): `main()` doesn't check if `GetDataModel()` succeeded (Lines 259-264)
+```cpp
+GetDataModel();  // Line 259 - return value ignored!
+auto place_id = read<std::uint64_t>(globals::datamodel + offsets::PlaceId); // Line 261
+```
+**Problem**: If `GetDataModel()` returns 0 (Roblox not fully loaded yet), `globals::datamodel` remains 0. Then line 261 reads from `0 + offsets::PlaceId` — reading from an invalid address.
+**Fix**: Check return value: `if (!GetDataModel()) { /* retry or error */ }`
+
+### BUG 24 (HIGH): `main()` doesn't check `Players` service before reading LocalPlayer (Lines 262-264)
+```cpp
+auto local_player = read<uintptr_t>(
+    utils::find_first_child_byclass(globals::datamodel, "Players")
+    + offsets::LocalPlayer);
+```
+**Problem**: If `find_first_child_byclass` returns 0 (Players service not found), this reads from `0 + offsets::LocalPlayer`.
+**Fix**: Store the result of `find_first_child_byclass` and null-check it first.
+
+### BUG 25 (MEDIUM): Notification system `alpha`, `y_offset`, `removing` fields are never used (Lines 34-36)
+```cpp
+float alpha;     // Set to 0.0f in constructor, never read
+float y_offset;  // Set to 0.0f in constructor, never read
+bool removing;   // Set to false in constructor, never read
+```
+These suggest planned fade/animation features that were never implemented.
+
+### BUG 26 (MEDIUM): Notification text size is estimated, not measured (Line 72)
+```cpp
+ImVec2 text_size(notif.message.length() * 8.0f, 15.0f);
+```
+**Problem**: Assumes every character is 8px wide. This is inaccurate for variable-width fonts and will cause misaligned/clipped text.
+
+### BUG 27 (LOW): `auto base = 0;` declared at file scope (Line 108) but never used
+Dead variable.
+
+### BUG 28 (LOW): `freopen_s` reuses same `FILE* f` for stdout and stderr (Lines 215-218)
+```cpp
+FILE* f = nullptr;
+freopen_s(&f, "CONOUT$", "w", stdout);
+freopen_s(&f, "CONOUT$", "w", stderr); // f now points to stderr handle, stdout handle leaked
+freopen_s(&f, "CONIN$",  "r", stdin);  // same issue
+```
+**Problem**: Each `freopen_s` call overwrites `f` with a new handle, but the previous handle is never stored. Minor issue since these handles persist via the global streams.
+
+---
+
+## FILE 8: `entry.h` — **ISSUES**
+
+### BUG 29 (MEDIUM): `vars::esp::esp_mode` declared as `bool` but used as an `int` (Line 126)
+```cpp
+inline bool esp_mode = 0;
+```
+**Problem**: Initialized with `0` (int), typed as `bool`. If this is meant to be a mode selector (0, 1, 2...), it should be `int`.
+
+### BUG 30 (LOW): 40+ `ID3D11ShaderResourceView*` globals declared as `inline` in header (Lines 289-332)
+**Problem**: These are all initialized to `nullptr` and occupy global namespace. They should probably be in a struct or namespace. Not a bug, but bad practice.
+
+### BUG 31 (LOW): Many `vars::` variables have no connection to any logic
+These variables exist in `entry.h` but are never checked in any logic code across the reviewed files:
+- `vars::misc::teleport_back` (line 211)
+- `vars::misc::fps_unlocker_enabled`, `fps_limit` (lines 218-219)
+- `vars::misc::star_count_enabled`, `star_count_value` (lines 221-222)
+- `vars::misc::anti_afk_enabled` (line 224)
+- `vars::misc::sky_customizer_enabled` and all sky/fog/ambient vars (lines 229-241)
+- `vars::misc::mines_gamble`, `slots_gamle`, `blackjack_gamble` (lines 245-247) — note typo: `slots_gamle` should be `slots_gamble`
+- `vars::misc::spotify` (line 254)
+- `vars::stream_sniper::enabled` (line 266)
+- `vars::instance_explorer::enabled`, `cache_time` (lines 279-280)
+- `vars::whitelist::users`, `targets` (lines 272-273)
+- `vars::aimbot::prediction`, `prediction_factor`, `prediction_distance_based`, and many aimbot vars
+
+---
+
+## SUMMARY OF MOST CRITICAL ISSUES
+
+| # | Severity | File | Description |
+|---|----------|------|-------------|
+| 1 | 🔴 CRITICAL | misc.cpp:805-810 | `NoJumpCoolDown` writes `bool` to float offset `JumpPower` |
+| 2 | 🔴 CRITICAL | misc.cpp:805 + 611 | `NoJumpCoolDown` and `jump_power` fight over same offset |
+| 3 | 🔴 CRITICAL | misc.h | 7+ functions declared but never implemented — linker errors |
+| 4 | 🟠 HIGH | misc.cpp:469 | Fly method 1 double-multiplies speed (speed² bug) |
+| 5 | 🟠 HIGH | misc.cpp:474 | `speed_hack()` missing null check for local_player |
+| 6 | 🟠 HIGH | entry.cpp:259 | `GetDataModel()` return value ignored — reads from null |
+| 7 | 🟠 HIGH | entry.cpp:262 | Players null check missing — reads from null+offset |
+| 8 | 🟠 HIGH | menu.cpp:76 | "Instant Prompt" toggle does nothing — implementation is commented out |
+| 9 | 🟡 MEDIUM | misc.cpp:757-760 | `antistomp_realud` doesn't null-check humanoid |
+| 10 | 🟡 MEDIUM | misc.cpp:337 | `sleep_for` on render thread causes stuttering |
+| 11 | 🟡 MEDIUM | renderer.cpp:87 | COM object allocated per-call — performance issue |
+| 12 | 🟡 MEDIUM | menu.cpp | Most features have no menu toggle — unreachable |

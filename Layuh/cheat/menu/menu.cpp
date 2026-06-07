@@ -73,7 +73,7 @@ bool CMenu::draw_menu() {
             ui::slider_float("Fly Speed", vars::misc::fly_speed, 1.0f, 250.0f);
             ui::toggle("Speed Hack", vars::misc::speed_hack_enabled);
             ui::slider_float("Walk Speed", vars::misc::speed_multiplier, 1.0f, 10.0f);
-            ui::toggle("Instant Prompt", vars::misc::instant_prompt_enabled);
+            //ui::toggle("Instant Prompt", vars::misc::instant_prompt_enabled); // Not implemented
             ui::end_group_box();
         }
 

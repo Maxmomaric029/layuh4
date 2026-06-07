@@ -256,12 +256,18 @@ int main()
     auto rbxBase   = drv::GetBase();
     auto rbxModule = drv::get_module(oxorany(L"RobloxPlayerBeta.dll"));
 
-    GetDataModel();
+    if (!GetDataModel()) {
+        utils::console_print_color(__FILE__, oxorany("Failed to get DataModel.\n"));
+        return 1;
+    }
 
     auto place_id    = read<std::uint64_t>(globals::datamodel + offsets::PlaceId);
-    auto local_player = read<uintptr_t>(
-        utils::find_first_child_byclass(globals::datamodel, oxorany("Players"))
-        + offsets::LocalPlayer);
+    auto players_service = utils::find_first_child_byclass(globals::datamodel, oxorany("Players"));
+    if (!players_service) {
+        utils::console_print_color(__FILE__, oxorany("Failed to find Players service.\n"));
+        return 1;
+    }
+    auto local_player = read<uintptr_t>(players_service + offsets::LocalPlayer);
     globals::local_player = local_player;
 
     spinner_message(oxorany("Startup complete."), 800, 100);

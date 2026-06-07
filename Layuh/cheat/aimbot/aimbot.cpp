@@ -19,9 +19,9 @@ static Matrix3 LookAtToMatrix(const Vector& cameraPosition, const Vector& target
     Vector up = forward.Cross(right);
 
     Matrix3 lookAtMatrix{};
-    lookAtMatrix.data[0] = -right.x;  lookAtMatrix.data[1] = up.x;  lookAtMatrix.data[2] = -forward.x;
+    lookAtMatrix.data[0] = right.x;   lookAtMatrix.data[1] = up.x;  lookAtMatrix.data[2] = -forward.x;
     lookAtMatrix.data[3] = right.y;   lookAtMatrix.data[4] = up.y;  lookAtMatrix.data[5] = -forward.y;
-    lookAtMatrix.data[6] = -right.z;  lookAtMatrix.data[7] = up.z;  lookAtMatrix.data[8] = -forward.z;
+    lookAtMatrix.data[6] = right.z;   lookAtMatrix.data[7] = up.z;  lookAtMatrix.data[8] = -forward.z;
 
     return lookAtMatrix;
 }
@@ -36,7 +36,8 @@ static Matrix3 lerp_matrix3(const Matrix3& a, const Matrix3& b, float t) {
 
 uintptr_t GetCachedMouseService() {
     static uintptr_t cached_mouse_service = 0;
-    cached_mouse_service = FindMouseService(globals::datamodel);
+    if (!cached_mouse_service)
+        cached_mouse_service = FindMouseService(globals::datamodel);
     return cached_mouse_service;
 }
 
@@ -261,7 +262,8 @@ bool CAimbot::sex_target()
                 if (classname == "Part" || classname == "MeshPart")
                 {
                     uint64_t part_primitive = read<uintptr_t>(child_instance + offsets::Primitive);
-                    write<bool>(part_primitive + offsets::CanCollide, true);
+                    if (part_primitive)
+                        write<bool>(part_primitive + offsets::CanCollide, true);
                 }
             }
         }
@@ -522,7 +524,8 @@ bool CAimbot::sex_target()
                         if (classname == "Part" || classname == "MeshPart")
                         {
                             uint64_t part_primitive = read<uintptr_t>(child_instance + offsets::Primitive);
-                            write<bool>(part_primitive + offsets::CanCollide, false);
+                            if (part_primitive)
+                                write<bool>(part_primitive + offsets::CanCollide, false);
                         }
                     }
                 }
@@ -538,14 +541,6 @@ bool CAimbot::sex_target()
 
         return false;
     }
-}
-
-bool got_aim_instances = false;
-AimInstances GetInstances(uintptr_t player) {
-    if (!got_aim_instances)
-	got_aim_instances = true;
-    AimInstances aims = GetAimInstances(player);
-	return aims;
 }
 
 bool CAimbot::aim_at_closest_player(matrix view_matrix)
@@ -603,6 +598,7 @@ bool CAimbot::aim_at_closest_player(matrix view_matrix)
         locked_target = 0;
         locked_bone_name.clear();
         last_aimbot_active = false;
+        ClipMouse(false);
         return false;
     }
 
@@ -964,21 +960,25 @@ bool CAimbot::aim_at_closest_player(matrix view_matrix)
     if (vars::aimbot::prediction)
     {
         auto humanoid_root_part = utils::find_first_child(character, "HumanoidRootPart");
-        auto h_r_p_primtive = read<uintptr_t>(humanoid_root_part + offsets::Primitive);
-        if (humanoid_root_part && h_r_p_primtive)
+        if (!humanoid_root_part) { /* skip prediction */ }
+        else
         {
-            auto velocity = read<Vector>(h_r_p_primtive + offsets::Velocity);
-            if (vars::aimbot::prediction_distance_based)
+            auto h_r_p_primtive = read<uintptr_t>(humanoid_root_part + offsets::Primitive);
+            if (h_r_p_primtive)
             {
-                float distance = (raw_pos - local_pos).Length();
-                const float min_distance = vars::aimbot::min_pred_distance;
-                float normalized_factor = (std::min)(1.0f, (std::max)(0.0f, (distance - min_distance) / (vars::aimbot::max_distance - min_distance)));
-                float scaled_prediction = vars::aimbot::prediction_factor * normalized_factor;
-                pos = raw_pos + velocity * scaled_prediction;
-            }
-            else
-            {
-                pos = raw_pos + velocity * vars::aimbot::prediction_factor;
+                auto velocity = read<Vector>(h_r_p_primtive + offsets::Velocity);
+                if (vars::aimbot::prediction_distance_based)
+                {
+                    float distance = (raw_pos - local_pos).Length();
+                    const float min_distance = vars::aimbot::min_pred_distance;
+                    float normalized_factor = (std::min)(1.0f, (std::max)(0.0f, (distance - min_distance) / (vars::aimbot::max_distance - min_distance)));
+                    float scaled_prediction = vars::aimbot::prediction_factor * normalized_factor;
+                    pos = raw_pos + velocity * scaled_prediction;
+                }
+                else
+                {
+                    pos = raw_pos + velocity * vars::aimbot::prediction_factor;
+                }
             }
         }
     }
@@ -1006,7 +1006,7 @@ bool CAimbot::aim_at_closest_player(matrix view_matrix)
                 smoothing = (std::max)(1.0f, smoothing);
                 move_x /= smoothing;
                 move_y /= smoothing;
-                mouse_event(MOUSEEVENTF_MOVE, static_cast<DWORD>(move_x), static_cast<DWORD>(move_y), 0, 0);
+                mouse_event(MOUSEEVENTF_MOVE, static_cast<DWORD>(static_cast<LONG>(move_x)), static_cast<DWORD>(static_cast<LONG>(move_y)), 0, 0);
             }
             last_mouse_aim_time = current_time;
         }
@@ -1014,6 +1014,7 @@ bool CAimbot::aim_at_closest_player(matrix view_matrix)
     if (vars::aimbot::aimbot_method == 1)
     {
         auto workspace = utils::find_first_child_byclass(globals::datamodel, "Workspace");
+        if (!workspace) return false;
         auto camera = read<uintptr_t>(workspace + offsets::Camera);
         Vector camera_position = read<Vector>(camera + offsets::CameraPos);
         Matrix3 camera_rotation = read<Matrix3>(camera + offsets::CameraRotation);
@@ -1226,8 +1227,8 @@ bool CAimbot::triggerbot(matrix view_matrix)
                     best_target = player_instance;
                     best_bone = bone_name;
                     best_pos = pos;
+                    break; // Found a hit for this player, stop checking more bones
                 }
-                break;
             }
         }
         else

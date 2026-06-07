@@ -153,39 +153,6 @@ void draw_skeleton(uintptr_t player_instance, uintptr_t character, const matrix&
     }
 }
 
-void range(float* X, float* Y, float range)
-{
-    if (abs((*X)) > range || abs((*Y)) > range)
-    {
-        if ((*Y) > (*X))
-        {
-            if ((*Y) > -(*X))
-            {
-                (*X) = range * (*X) / (*Y);
-                (*Y) = range;
-            }
-            else
-            {
-                (*Y) = -range * (*Y) / (*X);
-                (*X) = -range;
-            }
-        }
-        else
-        {
-            if ((*Y) > -(*X))
-            {
-                (*Y) = range * (*Y) / (*X);
-                (*X) = range;
-            }
-            else
-            {
-                (*X) = -range * (*X) / (*Y);
-                (*Y) = -range;
-            }
-        }
-    }
-}
-
 void calc_radar_point(Vector player_pos, int& screenx, int& screeny)
 {
     auto workspace = utils::find_first_child_byclass(globals::datamodel, "Workspace");
@@ -237,43 +204,6 @@ void calc_radar_point(Vector player_pos, int& screenx, int& screeny)
     // Convert polar coordinates (angle & distance) to Cartesian (x,y) for radar
     screenx = radar_center_x + static_cast<int>(sinf(rel_angle) * scaled_distance);
     screeny = radar_center_y - static_cast<int>(cosf(rel_angle) * scaled_distance);
-}
-
-Vector2D rotate_point(Vector2D radar_pos, Vector2D radar_size, Vector2D local_location, Vector2D target_location)
-{
-    auto dx = target_location.x - local_location.x;
-    auto dy = target_location.y - local_location.y;
-
-    auto X = -dy;
-    auto Y = dx;
-
-    float calculated_range = 34 * 1000;
-
-    range(&X, &Y, calculated_range);
-
-    int rad_x = (int)radar_pos.x;
-    int rad_y = (int)radar_pos.y;
-
-    float r_siz_x = radar_size.x;
-    float r_siz_y = radar_size.y;
-
-    int x_max = (int)r_siz_x + rad_x - 5;
-    int y_max = (int)r_siz_y + rad_y - 5;
-
-    Vector2D return_value;
-    return_value.x = rad_x + ((int)r_siz_x / 2 + int(X / calculated_range * r_siz_x));
-    return_value.y = rad_y + ((int)r_siz_y / 2 + int(Y / calculated_range * r_siz_y));
-
-    if (return_value.x > x_max)
-        return_value.x = x_max;
-    if (return_value.x < rad_x)
-        return_value.x = rad_x;
-    if (return_value.y > y_max)
-        return_value.y = y_max;
-    if (return_value.y < rad_y)
-        return_value.y = rad_y;
-
-    return return_value;
 }
 
 bool CESP::draw_radar(matrix view_matrix)
@@ -451,7 +381,6 @@ bool CESP::draw_radar(matrix view_matrix)
             player_dot_color
         );
 
-        float glow_pulse = sinf(time * 3.0f + dist_to_player * 0.05f) * 0.7f;
         ImColor glow_dot_color = player_dot_color;
         glow_dot_color.Value.w = 0.5f * pulse_strength;
 
@@ -605,10 +534,10 @@ bool CESP::draw_players(matrix view_matrix)
                 continue;
         }
         float health = read<float>(humanoid + offsets::Health);
-        if (health && health <= 0.0f)
+        if (health <= 0.0f)
             continue;
         int rig_type = get_rig_type(character);
-        if (!rig_type && rig_type == -1)
+        if (rig_type == -1)
             continue;
         if (vars::esp::esp_skeleton)
         {
@@ -667,6 +596,23 @@ bool CESP::draw_players(matrix view_matrix)
             bot_pos = head_result.first - Vector(0, 5.0f, 0);
             bot_valid = utils::world_to_screen(bot_pos, bot_screen, view_matrix, screen_size.x, screen_size.y);
         }
+        bool is_off_screen = !head_valid || head_screen.x < 0 || head_screen.x > screen_size.x || head_screen.y < 0 || head_screen.y > screen_size.y;
+        if (vars::esp::esp_oof_arrows && is_off_screen)
+        {
+            Vector2D arrow_target = head_screen;
+            if (!head_valid)
+            {
+                float w = view_matrix.m[3][0] * head_pos.x + view_matrix.m[3][1] * head_pos.y + view_matrix.m[3][2] * head_pos.z + view_matrix.m[3][3];
+                float inv_w = 1.0f / (w == 0.0f ? 0.001f : w);
+                float x = (view_matrix.m[0][0] * head_pos.x + view_matrix.m[0][1] * head_pos.y + view_matrix.m[0][2] * head_pos.z + view_matrix.m[0][3]) * inv_w;
+                float y = (view_matrix.m[1][0] * head_pos.x + view_matrix.m[1][1] * head_pos.y + view_matrix.m[1][2] * head_pos.z + view_matrix.m[1][3]) * inv_w;
+                arrow_target.x = (screen_size.x * 0.5f) * (x + 1.0f);
+                arrow_target.y = (screen_size.y * 0.5f) * (1.0f - y);
+                arrow_target.x = screen_center.x - (arrow_target.x - screen_center.x);
+                arrow_target.y = screen_center.y - (arrow_target.y - screen_center.y);
+            }
+            DrawArrow(screen_center, arrow_target, vars::aimbot::fov_value + 20.0f, oof_arrow_color, false);
+        }
         if (!head_valid)
             continue;
         float box_height = (bot_valid ? bot_screen.y : (mid_valid ? mid_screen.y : head_screen.y + 50.0f)) - head_screen.y;
@@ -703,10 +649,6 @@ bool CESP::draw_players(matrix view_matrix)
         }
         if (vars::esp::esp_box) {
             drawingapi::drawing.outlined_box(box_top_left, box_bottom_right, box_color, ImColor(0, 0, 0), 1.0f);
-        }
-        if (vars::esp::esp_oof_arrows)
-        {
-            DrawArrow(screen_center, head_screen, vars::aimbot::fov_value + 20.0f, oof_arrow_color, false);
         }
         health = std::clamp(health, 0.0f, 100.0f);
         ImColor health_color;
