@@ -7,7 +7,7 @@
 #include "fonts.hpp"
 #include <dwmapi.h>
 #include <d3d9.h>
-#include "d3dx9tex.h"
+#include "stb_image.h"
 #include <tchar.h>
 #include "map"
 #include "imgui/bytes.h"
@@ -33,7 +33,6 @@
 #include <queue>
 #include <set>
 #pragma comment(lib, "dwmapi.lib")
-#pragma comment(lib, "d3dx9.lib")
 #pragma comment(lib, "winhttp.lib")
 #pragma warning(disable : C4267)
 #pragma warning(disable : C4244)
@@ -88,8 +87,41 @@ LPDIRECT3DTEXTURE9 Layuh_preview_skeleton = nullptr;
 
 LPDIRECT3DTEXTURE9 LoadTextureFromMemory2(LPDIRECT3DDEVICE9 pDevice, const std::vector<uint8_t>& data) {
     if (data.empty()) return nullptr;
+
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+    unsigned char* image_data = stbi_load_from_memory(data.data(), static_cast<int>(data.size()), &width, &height, &channels, 4);
+    if (!image_data) return nullptr;
+
     LPDIRECT3DTEXTURE9 texture = nullptr;
-    D3DXCreateTextureFromFileInMemory(pDevice, data.data(), data.size(), &texture);
+    HRESULT hr = pDevice->CreateTexture(width, height, 1, 0, D3DFMT_A8R8G8B8, D3DPOOL_MANAGED, &texture, nullptr);
+    if (FAILED(hr)) {
+        stbi_image_free(image_data);
+        return nullptr;
+    }
+
+    D3DLOCKED_RECT rect;
+    if (SUCCEEDED(texture->LockRect(0, &rect, nullptr, 0))) {
+        unsigned char* dest = static_cast<unsigned char*>(rect.pBits);
+        for (int y = 0; y < height; ++y) {
+            unsigned char* src_row = image_data + y * width * 4;
+            unsigned char* dest_row = dest + y * rect.Pitch;
+            for (int x = 0; x < width; ++x) {
+                // Convert RGBA to BGRA
+                dest_row[x * 4 + 0] = src_row[x * 4 + 2]; // B
+                dest_row[x * 4 + 1] = src_row[x * 4 + 1]; // G
+                dest_row[x * 4 + 2] = src_row[x * 4 + 0]; // R
+                dest_row[x * 4 + 3] = src_row[x * 4 + 3]; // A
+            }
+        }
+        texture->UnlockRect(0);
+    } else {
+        texture->Release();
+        texture = nullptr;
+    }
+
+    stbi_image_free(image_data);
     return texture;
 }
 
