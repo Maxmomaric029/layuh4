@@ -107,72 +107,141 @@ void spinner_message(const char* message, int duration_ms = 2000, int interval_m
 // ─── DataModel discovery ─────────────────────────────────────────────────────
 auto base = 0;
 
-uint64_t GetDataModel() {
-    // Validate critical offsets before dereferencing
-    if (!offsets::TaskSchedulerPointer) {
-        printf(oxorany("[GetDataModel] ERROR: TaskSchedulerPointer offset is 0\n"));
-        return 0;
-    }
-    if (!offsets::FakeDataModelPointer) {
-        printf(oxorany("[GetDataModel] ERROR: FakeDataModelPointer offset is 0\n"));
-        return 0;
-    }
-    if (!offsets::FakeDataModelToDataModel) {
-        printf(oxorany("[GetDataModel] ERROR: FakeDataModelToDataModel offset is 0\n"));
-        return 0;
-    }
+// Fallback: parse Roblox log file for RenderView address (from reference external)
+// Roblox writes "initialize view(0x...)" to its log on startup
+static uint64_t GetRenderViewFromLog() {
+    // Roblox logs are in %LOCALAPPDATA%\Roblox\logs\
+    char* pAppData = nullptr;
+    size_t sz = 0;
+    _dupenv_s(&pAppData, &sz, "LOCALAPPDATA");
+    if (!pAppData) return 0;
+    std::string logDir = std::string(pAppData) + "\\Roblox\\logs";
+    free(pAppData);
 
-    uintptr_t scheduler = read<uintptr_t>(drv::GetBase() + offsets::TaskSchedulerPointer);
-    if (!scheduler) {
-        utils::console_print_color(__FILE__, oxorany("TaskScheduler pointer is null, Roblox may not be ready"));
-        return 0;
-    }
-
-    uintptr_t jobStart = read<uintptr_t>(scheduler + offsets::JobStart);
-    uintptr_t jobEnd   = read<uintptr_t>(scheduler + offsets::JobEnd);
-    if (!jobStart || !jobEnd || jobStart >= jobEnd) {
-        utils::console_print_color(__FILE__, oxorany("Job list empty/invalid in scheduler"));
-        return 0;
-    }
-
-    for (uintptr_t job = jobStart; job < jobEnd; job += 0x10) {
-        uintptr_t jobAddress = read<uintptr_t>(job);
-        if (!jobAddress) continue;
-
-        std::string jobName = readstring(jobAddress + offsets::Job_Name);
-        if (jobName == oxorany("RenderJob")) {
-            auto RenderView = read<uintptr_t>(jobAddress + offsets::RenderJobToRenderView);
-            if (!RenderView) {
-                utils::console_print_color(__FILE__, oxorany("Found RenderJob but RenderView is null"));
-                continue;
+    // Find the most recent .log file
+    std::string latestLog;
+    auto latestTime = std::filesystem::file_time_type::min();
+    try {
+        if (!std::filesystem::exists(logDir)) return 0;
+        for (const auto& entry : std::filesystem::directory_iterator(logDir)) {
+            if (entry.path().extension() == ".log") {
+                auto ft = entry.last_write_time();
+                if (ft > latestTime) {
+                    latestTime = ft;
+                    latestLog = entry.path().string();
+                }
             }
+        }
+    } catch (...) { return 0; }
+    if (latestLog.empty()) return 0;
 
-            globals::visual_engine = read<uintptr_t>(RenderView + offsets::VisualEngine);
-            if (!globals::visual_engine)
-                utils::console_print_color(__FILE__, oxorany("RenderView found but VisualEngine is 0"));
-
-            uintptr_t BaseAddr = drv::GetBase();
-            uintptr_t FakeDataModel = read<uintptr_t>(BaseAddr + offsets::FakeDataModelPointer);
-            if (!FakeDataModel) {
-                utils::console_print_color(__FILE__, oxorany("FakeDataModel pointer is null at base+offset"));
-                continue;
+    // Search for "initialize view(" in the log
+    std::ifstream logFile(latestLog);
+    std::string line;
+    while (std::getline(logFile, line)) {
+        size_t pos = line.find(oxorany("initialize view("));
+        if (pos != std::string::npos) {
+            // Extract hex address: "...initialize view(0x7ff...)..."
+            pos += 21; // skip "initialize view("
+            size_t endPos = line.find(')', pos);
+            if (endPos != std::string::npos) {
+                std::string hexStr = line.substr(pos, endPos - pos);
+                uint64_t renderView = std::strtoull(hexStr.c_str(), nullptr, 16);
+                if (renderView) {
+                    printf(oxorany("[GetDataModel] Log-file RenderView: %llx\n"), (unsigned long long)renderView);
+                    return renderView;
+                }
             }
-
-            auto realDataModel = static_cast<uintptr_t>(
-                read<std::uint64_t>(FakeDataModel + offsets::FakeDataModelToDataModel));
-            if (!realDataModel) {
-                utils::console_print_color(__FILE__, oxorany("FakeDataModel found but DataModel deref is null"));
-                continue;
-            }
-
-            globals::datamodel = realDataModel;
-            utils::console_print_success(__FILE__, oxorany("DataModel: %llx | VisualEngine: %llx"),
-                (unsigned long long)realDataModel,
-                (unsigned long long)globals::visual_engine);
-            return jobAddress;
         }
     }
-    utils::console_print_color(__FILE__, oxorany("No RenderJob found in scheduler jobs"));
+    return 0;
+}
+
+// Fallback: get DataModel via log-file method (from reference external)
+// render_view + 0xD8 -> game_ptr, game_ptr + 0x150 -> DataModel
+static uint64_t GetDataModelFromLog() {
+    uint64_t renderView = GetRenderViewFromLog();
+    if (!renderView) return 0;
+
+    uint64_t gamePtr = read<uint64_t>(renderView + 0xD8);
+    if (!gamePtr) {
+        utils::console_print_color(__FILE__, oxorany("Log RenderView found but gamePtr is null at +0xD8"));
+        return 0;
+    }
+
+    uint64_t dm = read<uint64_t>(gamePtr + 0x150);
+    if (!dm) {
+        utils::console_print_color(__FILE__, oxorany("gamePtr found but DataModel is null at +0x150"));
+        return 0;
+    }
+
+    utils::console_print_success(__FILE__, oxorany("DataModel via log-file: %llx"), (unsigned long long)dm);
+    return dm;
+}
+
+uint64_t GetDataModel() {
+    // Try TaskScheduler path first (primary)
+    if (offsets::TaskSchedulerPointer && offsets::FakeDataModelPointer && offsets::FakeDataModelToDataModel) {
+        uintptr_t scheduler = read<uintptr_t>(drv::GetBase() + offsets::TaskSchedulerPointer);
+        if (scheduler) {
+            uintptr_t jobStart = read<uintptr_t>(scheduler + offsets::JobStart);
+            uintptr_t jobEnd   = read<uintptr_t>(scheduler + offsets::JobEnd);
+            if (jobStart && jobEnd && jobStart < jobEnd) {
+                for (uintptr_t job = jobStart; job < jobEnd; job += 0x10) {
+                    uintptr_t jobAddress = read<uintptr_t>(job);
+                    if (!jobAddress) continue;
+
+                    std::string jobName = readstring(jobAddress + offsets::Job_Name);
+                    if (jobName == oxorany("RenderJob")) {
+                        auto RenderView = read<uintptr_t>(jobAddress + offsets::RenderJobToRenderView);
+                        if (!RenderView) { continue; }
+
+                        globals::visual_engine = read<uintptr_t>(RenderView + offsets::VisualEngine);
+                        if (!globals::visual_engine)
+                            utils::console_print_color(__FILE__, oxorany("RenderView found but VisualEngine is 0"));
+
+                        uintptr_t FakeDataModel = read<uintptr_t>(drv::GetBase() + offsets::FakeDataModelPointer);
+                        if (!FakeDataModel) { continue; }
+
+                        auto realDataModel = static_cast<uintptr_t>(
+                            read<std::uint64_t>(FakeDataModel + offsets::FakeDataModelToDataModel));
+                        if (!realDataModel) { continue; }
+
+                        globals::datamodel = realDataModel;
+                        utils::console_print_success(__FILE__, oxorany("DataModel via scheduler: %llx | VisualEngine: %llx"),
+                            (unsigned long long)realDataModel,
+                            (unsigned long long)globals::visual_engine);
+                        return jobAddress;
+                    }
+                }
+                utils::console_print_color(__FILE__, oxorany("No RenderJob found in scheduler - trying log fallback"));
+            } else {
+                utils::console_print_color(__FILE__, oxorany("Scheduler jobs empty - trying log fallback"));
+            }
+        } else {
+            utils::console_print_color(__FILE__, oxorany("Scheduler null - trying log fallback"));
+        }
+    } else {
+        printf(oxorany("[GetDataModel] Scheduler offsets missing - trying log fallback\n"));
+    }
+
+    // Fallback: try log-file method (doesn't require any offsets)
+    // Returns DataModel from renderView+0xD8->gamePtr+0x150 (reference external pattern)
+    uint64_t dm = GetDataModelFromLog();
+    if (dm) {
+        globals::datamodel = dm;
+        // Get VisualEngine via renderView+0x10 (reference external)
+        static uint64_t cachedRV = 0; // cache so we don't re-parse log
+        if (!cachedRV) cachedRV = GetRenderViewFromLog();
+        if (cachedRV) {
+            globals::visual_engine = read<uintptr_t>(cachedRV + 0x10);
+            utils::console_print_success(__FILE__, oxorany("VisualEngine via log: %llx"),
+                (unsigned long long)globals::visual_engine);
+        }
+        return 0;
+    }
+
+    utils::console_print_color(__FILE__, oxorany("All DataModel paths failed"));
     return 0;
 }
 
@@ -211,6 +280,10 @@ void rescan_thread()
             }
         }
 
+        // Fallback: try log-file method
+        if (!datamodel) {
+            datamodel = GetDataModelFromLog();
+        }
         if (!datamodel) continue;
 
         std::uint64_t current_place_id = read<std::uint64_t>(datamodel + offsets::PlaceId);
